@@ -104,8 +104,9 @@ Fix:
 ```bash
 conda deactivate          # repeat until (base) disappears from your prompt
 source .venv/bin/activate
+pip uninstall clutch-tracker -y
 pip install -e ".[dev]"
-clutch-tracker doctor
+clutch-tracker list-targets
 ```
 
 **Fallback (always works from repo root):**
@@ -113,12 +114,6 @@ clutch-tracker doctor
 ```bash
 python run.py list-targets
 python run.py doctor
-```
-
-After `git pull`, reinstall so the `clutch-tracker` command picks up the bootstrap launcher:
-
-```bash
-pip install -e ".[dev]"
 ```
 
 **Do not** keep an old `clutch_tracker/` directory at the repo root — only `src/clutch_tracker/` should exist.
