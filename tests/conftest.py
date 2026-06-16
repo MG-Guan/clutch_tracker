@@ -21,6 +21,7 @@ def project_copy(tmp_path: Path) -> Path:
     (dest / "data" / "targets").mkdir(parents=True)
     (dest / "reports" / "daily").mkdir(parents=True)
     (dest / "reports" / "summary").mkdir(parents=True)
+    (dest / "reports" / "recommendations").mkdir(parents=True)
     (dest / "snapshots").mkdir(parents=True)
     shutil.copy(root / "data" / "registry" / "targets.csv", dest / "data" / "registry" / "targets.csv")
     initialize_targets(dest)

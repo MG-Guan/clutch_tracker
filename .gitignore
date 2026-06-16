@@ -21,6 +21,8 @@ data/targets/*/
 !data/targets/.gitkeep
 reports/daily/*/
 !reports/daily/.gitkeep
+reports/recommendations/*/
+!reports/recommendations/.gitkeep
 reports/summary/*
 !reports/summary/.gitkeep
 snapshots/*/

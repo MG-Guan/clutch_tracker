@@ -45,6 +45,7 @@ python -m clutch_tracker.cli validate-config
 python -m clutch_tracker.cli initialize-targets
 python -m clutch_tracker.cli import-scan <scan-json>
 python -m clutch_tracker.cli generate-report --target <target_id>
+python -m clutch_tracker.cli generate-recommendations --target <target_id>
 python -m clutch_tracker.cli validate-repository
 ```
 
@@ -96,6 +97,7 @@ data/targets/<target_id>/
 └── current_inventory.json
 
 reports/daily/<target_id>/
+reports/recommendations/<target_id>/
 snapshots/<target_id>/
 ```
 
