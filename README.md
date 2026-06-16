@@ -108,10 +108,17 @@ pip install -e ".[dev]"
 clutch-tracker doctor
 ```
 
-**Fallback without pip install** (always works from repo root):
+**Fallback (always works from repo root):**
 
 ```bash
 python run.py list-targets
+python run.py doctor
+```
+
+After `git pull`, reinstall so the `clutch-tracker` command picks up the bootstrap launcher:
+
+```bash
+pip install -e ".[dev]"
 ```
 
 **Do not** keep an old `clutch_tracker/` directory at the repo root — only `src/clutch_tracker/` should exist.

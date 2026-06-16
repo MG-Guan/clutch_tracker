@@ -18,9 +18,6 @@ dev = [
     "pytest-cov>=5.0",
 ]
 
-[project.scripts]
-clutch-tracker = "clutch_tracker.cli:main"
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 

@@ -1,24 +1,9 @@
 #!/usr/bin/env python3
-"""
-Development launcher — works without pip install when run from repo root.
-
-Usage:
-    python run.py list-targets
-    python run.py show-target ford-f150-ontario
-"""
+"""Run CLI from repo root: python run.py list-targets"""
 
 from __future__ import annotations
 
-import sys
+import runpy
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "src"
-src_str = str(SRC)
-if src_str not in sys.path:
-    sys.path.insert(0, src_str)
-
-from clutch_tracker.cli import main  # noqa: E402
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+runpy.run_path(str(Path(__file__).resolve().parent / "scripts" / "clutch-tracker"), run_name="__main__")
