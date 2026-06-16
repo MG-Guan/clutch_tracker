@@ -17,9 +17,7 @@ targets:
       model: F-150
       model_aliases:
         - F150
-        - F 150
-        - F150XLT
       province: "ON"
-      min_year: 2019
-      max_year: 2024
+      min_year: 2021
+      max_year: 2026
       search_query: "Ford F-150"
