@@ -12,6 +12,7 @@ from clutch_tracker.comparison import import_scan
 from clutch_tracker.config import load_settings, load_targets, project_root
 from clutch_tracker.criteria import build_search_criteria, format_criteria_summary
 from clutch_tracker.doctor import run_doctor
+from clutch_tracker.recommendations import generate_recommendations_report
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.target_manager import initialize_targets
 from clutch_tracker.validation import validate_config, validate_repository
@@ -83,6 +84,16 @@ def cmd_generate_report(root: Path, target_id: str) -> int:
     return 0
 
 
+def cmd_generate_recommendations(root: Path, target_id: str, top_n: int) -> int:
+    targets = {t.target_id for t in load_targets(root)}
+    if target_id not in targets:
+        print(f"ERROR: Unknown target_id: {target_id}", file=sys.stderr)
+        return 1
+    report_path = generate_recommendations_report(root, target_id, top_n=top_n)
+    print(f"Recommendations written to {report_path}")
+    return 0
+
+
 def cmd_validate_repository(root: Path) -> int:
     result = validate_repository(root)
     for warning in result.warnings:
@@ -114,6 +125,19 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser = sub.add_parser("generate-report", help="Generate daily report for a target")
     report_parser.add_argument("--target", required=True, dest="target_id", help="Target ID")
 
+    rec_parser = sub.add_parser(
+        "generate-recommendations",
+        help="Generate multi-dimensional recommendations report for a target",
+    )
+    rec_parser.add_argument("--target", required=True, dest="target_id", help="Target ID")
+    rec_parser.add_argument(
+        "--top",
+        type=int,
+        default=3,
+        dest="top_n",
+        help="Number of picks per dimension (default: 3)",
+    )
+
     return parser
 
 
@@ -132,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
         "initialize-targets": lambda: cmd_initialize_targets(root),
         "import-scan": lambda: cmd_import_scan(root, args.scan_json),
         "generate-report": lambda: cmd_generate_report(root, args.target_id),
+        "generate-recommendations": lambda: cmd_generate_recommendations(root, args.target_id, args.top_n),
         "validate-repository": lambda: cmd_validate_repository(root),
     }
     return commands[args.command]()

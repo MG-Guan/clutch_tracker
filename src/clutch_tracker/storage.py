@@ -176,6 +176,10 @@ def daily_report_dir(root: Path, target_id: str) -> Path:
     return root / "reports" / "daily" / target_id
 
 
+def recommendations_report_dir(root: Path, target_id: str) -> Path:
+    return root / "reports" / "recommendations" / target_id
+
+
 def snapshot_dir(root: Path, target_id: str) -> Path:
     return root / "snapshots" / target_id
 

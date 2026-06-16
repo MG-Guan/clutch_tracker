@@ -30,6 +30,8 @@ flowchart TD
     Inv --> Report
     Report --> Daily
     Report --> Snap
+    Inv --> Recs["recommendations.py"]
+    Recs --> RecDir["reports/recommendations/&lt;target_id&gt;/"]
 ```
 
 ### Design principles
@@ -58,6 +60,7 @@ data/targets/<target_id>/
 └── current_inventory.json # Latest inventory snapshot
 
 reports/daily/<target_id>/   # Generated markdown reports
+reports/recommendations/<target_id>/  # Multi-dimensional recommendation reports
 snapshots/<target_id>/       # Point-in-time inventory snapshots
 data/raw_scans/              # Archived browser scan JSON
 data/registry/targets.csv    # Target metadata registry
@@ -138,6 +141,7 @@ clutch-tracker validate-config
 clutch-tracker initialize-targets
 clutch-tracker import-scan tests/fixtures/scan_complete.json
 clutch-tracker generate-report --target ford-f150-ontario
+clutch-tracker generate-recommendations --target ford-f150-ontario
 clutch-tracker validate-repository
 
 # Or via Python module
@@ -173,6 +177,21 @@ Define search targets with unique `target_id` values and criteria. Vehicle makes
 
 Browser agents should call `show-target <target_id>` to retrieve the full search payload including `model_search_terms`.
 
+### Recommendations report
+
+`generate-recommendations` reads `current_inventory.json`, `vehicles.csv`, and `listing_events.csv` to produce a single markdown report with ranked picks across six dimensions:
+
+| Dimension | Ranking logic |
+|-----------|---------------|
+| Best value | Lowest price-per-km (known price and mileage only) |
+| Lowest price | Lowest current asking price |
+| Low mileage | Lowest odometer reading |
+| Best price by year | Cheapest listing per model year |
+| New listings | Most recently first-seen listings |
+| Recent price drops | Largest reductions from `price_changed` events |
+
+Use `--top N` to control how many picks appear per section (default: 3). Partial scans (`scan_complete: false`) trigger a data-quality warning in the report.
+
 ### `config/settings.yaml`
 
 Global settings: timezone, logging, reporting fields, and scan behavior.
@@ -200,6 +219,7 @@ See [AGENTS.md](AGENTS.md) for AI agent operating instructions.
 │   └── targets/
 ├── reports/
 │   ├── daily/
+│   ├── recommendations/
 │   └── summary/
 ├── snapshots/
 ├── src/clutch_tracker/
@@ -211,6 +231,7 @@ See [AGENTS.md](AGENTS.md) for AI agent operating instructions.
 │   ├── comparison.py
 │   ├── events.py
 │   ├── reporting.py
+│   ├── recommendations.py
 │   └── target_manager.py
 └── tests/
 ```
