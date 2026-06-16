@@ -30,7 +30,7 @@ def test_now_iso_contains_timezone_offset(project_copy: Path):
 
 
 def test_append_observations_is_append_only(project_copy: Path):
-    target_id = "pickup-trucks-ontario"
+    target_id = "ford-f150-ontario"
     obs1 = Observation(
         observation_id="obs_1",
         vin="VIN001",
@@ -55,7 +55,7 @@ def test_append_observations_is_append_only(project_copy: Path):
 
 
 def test_save_and_load_vehicles(project_copy: Path):
-    target_id = "pickup-trucks-ontario"
+    target_id = "ford-f150-ontario"
     vehicles = {
         "VIN123": VehicleRecord(
             vin="VIN123",

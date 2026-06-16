@@ -16,6 +16,8 @@ class TargetCriteria:
     max_year: int | None = None
     make: str | None = None
     model: str | None = None
+    model_aliases: tuple[str, ...] = ()
+    search_query: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 

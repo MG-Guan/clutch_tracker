@@ -40,6 +40,7 @@ Deterministic Python (comparison.py, events.py, storage.py)
 
 ```bash
 python -m clutch_tracker.cli list-targets
+python -m clutch_tracker.cli show-target <target_id>
 python -m clutch_tracker.cli validate-config
 python -m clutch_tracker.cli initialize-targets
 python -m clutch_tracker.cli import-scan <scan-json>
@@ -47,11 +48,27 @@ python -m clutch_tracker.cli generate-report --target <target_id>
 python -m clutch_tracker.cli validate-repository
 ```
 
+## Model search in targets.yaml
+
+Use `make`, `model`, and optional `model_aliases` to track a specific vehicle line (e.g. F-150):
+
+```yaml
+criteria:
+  make: Ford
+  model: F-150
+  model_aliases:
+    - F150
+    - F 150
+  search_query: "Ford F-150"
+```
+
+`show-target` returns `model_search_terms` — the deduplicated list of model strings agents should match.
+
 ## Scan JSON Format
 
 ```json
 {
-  "target_id": "pickup-trucks-ontario",
+  "target_id": "ford-f150-ontario",
   "scan_id": "scan_20260616_001",
   "scanned_at": "2026-06-16T10:00:00-04:00",
   "scan_complete": true,

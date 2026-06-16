@@ -13,7 +13,7 @@ def test_validate_repository_after_init(project_copy: Path):
 
 
 def test_validate_target_data_detects_missing_file(project_copy: Path):
-    target_id = "pickup-trucks-ontario"
+    target_id = "ford-f150-ontario"
     inv = project_copy / "data" / "targets" / target_id / "current_inventory.json"
     inv.unlink()
     result = validate_target_data(project_copy, target_id)

@@ -71,8 +71,28 @@ def parse_target(entry: dict[str, Any]) -> Target:
     if not isinstance(criteria_raw, dict):
         raise ValueError(f"Target {target_id!r} criteria must be a mapping")
 
-    known_keys = {"body_style", "province", "min_year", "max_year", "make", "model"}
+    known_keys = {
+        "body_style",
+        "province",
+        "min_year",
+        "max_year",
+        "make",
+        "model",
+        "model_aliases",
+        "search_query",
+    }
     extra = {k: v for k, v in criteria_raw.items() if k not in known_keys}
+
+    model_aliases_raw = criteria_raw.get("model_aliases", [])
+    if model_aliases_raw is None:
+        model_aliases_raw = []
+    if not isinstance(model_aliases_raw, list):
+        raise ValueError(f"Target {target_id!r} model_aliases must be a list")
+    model_aliases = tuple(str(a) for a in model_aliases_raw if a)
+
+    search_query = criteria_raw.get("search_query")
+    if search_query is not None and not isinstance(search_query, str):
+        raise ValueError(f"Target {target_id!r} search_query must be a string")
 
     criteria = TargetCriteria(
         body_style=criteria_raw.get("body_style"),
@@ -81,6 +101,8 @@ def parse_target(entry: dict[str, Any]) -> Target:
         max_year=criteria_raw.get("max_year"),
         make=criteria_raw.get("make"),
         model=criteria_raw.get("model"),
+        model_aliases=model_aliases,
+        search_query=search_query,
         extra=extra,
     )
     return Target(
