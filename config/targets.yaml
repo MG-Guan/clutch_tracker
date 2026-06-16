@@ -23,30 +23,3 @@ targets:
       min_year: 2019
       max_year: 2024
       search_query: "Ford F-150"
-
-  - target_id: pickup-trucks-ontario
-    label: "Ontario pickup trucks (all makes)"
-    enabled: true
-    criteria:
-      body_style: pickup
-      province: "ON"
-      min_year: 2019
-      max_year: 2024
-
-  - target_id: compact-suvs-ontario
-    label: "Ontario compact SUVs"
-    enabled: true
-    criteria:
-      body_style: suv
-      province: "ON"
-      min_year: 2020
-      max_year: 2025
-
-  - target_id: sedans-quebec
-    label: "Quebec sedans"
-    enabled: false
-    criteria:
-      body_style: sedan
-      province: "QC"
-      min_year: 2018
-      max_year: 2024

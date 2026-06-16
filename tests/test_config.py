@@ -13,9 +13,7 @@ from clutch_tracker.validation import validate_config, validate_targets_config
 def test_load_targets_from_project():
     targets = load_targets(project_root())
     ids = [t.target_id for t in targets]
-    assert "ford-f150-ontario" in ids
-    assert "pickup-trucks-ontario" in ids
-    assert "compact-suvs-ontario" in ids
+    assert ids == ["ford-f150-ontario"]
     assert len(ids) == len(set(ids))
 
 
