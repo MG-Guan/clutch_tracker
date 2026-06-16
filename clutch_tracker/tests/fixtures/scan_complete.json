@@ -1,0 +1,28 @@
+{
+  "target_id": "pickup-trucks-ontario",
+  "scan_id": "scan_test_001",
+  "scanned_at": "2026-06-16T10:00:00-04:00",
+  "scan_complete": true,
+  "source": "test-fixture",
+  "vehicles": [
+    {
+      "vin": "1FTFW1E50NFA12345",
+      "listing_id": "clutch-100",
+      "listing_url": "https://www.clutch.ca/vehicles/100",
+      "year": 2022,
+      "make": "Ford",
+      "model": "F-150",
+      "trim": "XLT",
+      "price_cad": 45000,
+      "mileage_km": 32000
+    },
+    {
+      "vin": "2C3CCAAG5JH123456",
+      "listing_id": "clutch-101",
+      "year": 2021,
+      "make": "Chrysler",
+      "model": "300",
+      "price_cad": 28000
+    }
+  ]
+}

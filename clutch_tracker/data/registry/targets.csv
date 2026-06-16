@@ -1,0 +1,4 @@
+target_id,label,enabled,created_at,updated_at
+pickup-trucks-ontario,Ontario pickup trucks,true,2026-06-15T23:35:33-04:00,2026-06-15T23:35:33-04:00
+compact-suvs-ontario,Ontario compact SUVs,true,2026-06-15T23:35:33-04:00,2026-06-15T23:35:33-04:00
+sedans-quebec,Quebec sedans,false,2026-06-15T23:35:33-04:00,2026-06-15T23:35:33-04:00
