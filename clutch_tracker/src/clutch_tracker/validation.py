@@ -81,6 +81,22 @@ def validate_targets_config(root: Path | None = None) -> ValidationResult:
         if "enabled" in entry and not isinstance(entry["enabled"], bool):
             result.add_error(f"Target {target_id} enabled must be boolean")
 
+        criteria = entry.get("criteria", {})
+        if isinstance(criteria, dict):
+            aliases = criteria.get("model_aliases")
+            if aliases is not None and not isinstance(aliases, list):
+                result.add_error(f"Target {target_id} model_aliases must be a list")
+            elif isinstance(aliases, list):
+                for index, alias in enumerate(aliases):
+                    if not isinstance(alias, str) or not alias.strip():
+                        result.add_error(
+                            f"Target {target_id} model_aliases[{index}] must be a non-empty string"
+                        )
+            if criteria.get("model") and not criteria.get("make"):
+                result.add_warning(
+                    f"Target {target_id} has model without make; consider setting make for precise search"
+                )
+
     try:
         load_targets(root_path)
     except Exception as exc:

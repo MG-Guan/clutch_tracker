@@ -10,6 +10,7 @@ from pathlib import Path
 
 from clutch_tracker.comparison import import_scan
 from clutch_tracker.config import load_settings, load_targets, project_root
+from clutch_tracker.criteria import build_search_criteria, format_criteria_summary
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.target_manager import initialize_targets
 from clutch_tracker.validation import validate_config, validate_repository
@@ -28,7 +29,17 @@ def cmd_list_targets(root: Path) -> int:
     targets = load_targets(root)
     for target in targets:
         status = "enabled" if target.enabled else "disabled"
-        print(f"{target.target_id}\t{target.label}\t{status}")
+        criteria = format_criteria_summary(target.criteria)
+        print(f"{target.target_id}\t{target.label}\t{status}\t{criteria}")
+    return 0
+
+
+def cmd_show_target(root: Path, target_id: str) -> int:
+    targets = {t.target_id: t for t in load_targets(root)}
+    if target_id not in targets:
+        print(f"ERROR: Unknown target_id: {target_id}", file=sys.stderr)
+        return 1
+    print(json.dumps(build_search_criteria(targets[target_id]), indent=2))
     return 0
 
 
@@ -87,10 +98,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clutch_tracker", description="Clutch.ca vehicle target tracker")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("list-targets", help="List configured targets")
+    sub.add_parser("list-targets", help="List configured targets with search criteria")
     sub.add_parser("validate-config", help="Validate configuration files")
     sub.add_parser("initialize-targets", help="Initialize target data directories")
     sub.add_parser("validate-repository", help="Validate repository data integrity")
+
+    show_parser = sub.add_parser("show-target", help="Show search criteria JSON for a target")
+    show_parser.add_argument("target_id", help="Target ID")
 
     import_parser = sub.add_parser("import-scan", help="Import a browser scan JSON file")
     import_parser.add_argument("scan_json", type=Path, help="Path to scan JSON file")
@@ -110,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
 
     commands = {
         "list-targets": lambda: cmd_list_targets(root),
+        "show-target": lambda: cmd_show_target(root, args.target_id),
         "validate-config": lambda: cmd_validate_config(root),
         "initialize-targets": lambda: cmd_initialize_targets(root),
         "import-scan": lambda: cmd_import_scan(root, args.scan_json),

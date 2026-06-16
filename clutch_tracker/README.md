@@ -86,8 +86,11 @@ pip install -e ".[dev]"
 ## CLI usage
 
 ```bash
-# List configured targets
+# List configured targets (includes make/model summary)
 python -m clutch_tracker.cli list-targets
+
+# Show full search criteria JSON for a target (for browser agents)
+python -m clutch_tracker.cli show-target ford-f150-ontario
 
 # Validate configuration
 python -m clutch_tracker.cli validate-config
@@ -109,7 +112,27 @@ python -m clutch_tracker.cli validate-repository
 
 ### `config/targets.yaml`
 
-Define search targets with unique `target_id` values and criteria (body style, province, year range, etc.). Vehicle makes and models appear here only — never in Python source.
+Define search targets with unique `target_id` values and criteria. Vehicle makes and models appear here only — never in Python source.
+
+**Model-specific search** (e.g. Ford F-150):
+
+```yaml
+- target_id: ford-f150-ontario
+  label: "Ontario Ford F-150"
+  enabled: true
+  criteria:
+    make: Ford
+    model: F-150
+    model_aliases:       # alternate spellings (F150, F 150, …)
+      - F150
+      - F 150
+    province: ON
+    min_year: 2019
+    max_year: 2024
+    search_query: "Ford F-150"   # optional Clutch.ca search box text
+```
+
+Browser agents should call `show-target <target_id>` to retrieve the full search payload including `model_search_terms`.
 
 ### `config/settings.yaml`
 
