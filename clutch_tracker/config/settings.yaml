@@ -1,0 +1,24 @@
+timezone: America/Toronto
+timestamp_format: iso8601
+
+storage:
+  atomic_writes: true
+
+logging:
+  level: INFO
+  format: "%(asctime)s %(levelname)s %(name)s %(message)s"
+
+reporting:
+  daily_report_fields:
+    - vin
+    - year
+    - make
+    - model
+    - price_cad
+    - mileage_km
+    - listing_url
+    - first_seen_at
+    - last_seen_at
+
+scan:
+  require_scan_complete_for_removals: true

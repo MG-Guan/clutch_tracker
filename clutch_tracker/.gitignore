@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+*.log
+.DS_Store
+
+# Runtime data (keep structure, ignore generated content)
+data/raw_scans/*
+!data/raw_scans/.gitkeep
+data/targets/*/
+!data/targets/.gitkeep
+reports/daily/*/
+!reports/daily/.gitkeep
+reports/summary/*
+!reports/summary/.gitkeep
+snapshots/*/
+!snapshots/.gitkeep

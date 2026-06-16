@@ -1,0 +1,15 @@
+{
+  "target_id": "pickup-trucks-ontario",
+  "scan_id": "scan_test_partial",
+  "scanned_at": "2026-06-16T11:00:00-04:00",
+  "scan_complete": false,
+  "source": "test-fixture",
+  "vehicles": [
+    {
+      "vin": "1FTFW1E50NFA12345",
+      "listing_id": "clutch-100",
+      "price_cad": 44000,
+      "mileage_km": 32500
+    }
+  ]
+}

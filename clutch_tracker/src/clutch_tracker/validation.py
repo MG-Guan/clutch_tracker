@@ -1,0 +1,224 @@
+"""Configuration and repository validation."""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from clutch_tracker.config import load_settings, load_targets, load_targets_config, project_root
+from clutch_tracker.storage import (
+    EVENTS_HEADERS,
+    OBSERVATIONS_HEADERS,
+    REGISTRY_HEADERS,
+    VEHICLES_HEADERS,
+    events_path,
+    inventory_path,
+    observations_path,
+    read_csv_rows,
+    registry_path,
+    vehicles_path,
+)
+
+logger = logging.getLogger(__name__)
+
+REQUIRED_TARGET_FILES = [
+    "vehicles.csv",
+    "observations.csv",
+    "listing_events.csv",
+    "current_inventory.json",
+]
+
+
+@dataclass
+class ValidationResult:
+    """Aggregated validation outcome."""
+
+    ok: bool = True
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def add_error(self, message: str) -> None:
+        self.ok = False
+        self.errors.append(message)
+
+    def add_warning(self, message: str) -> None:
+        self.warnings.append(message)
+
+
+def validate_targets_config(root: Path | None = None) -> ValidationResult:
+    """Validate targets.yaml structure and uniqueness."""
+    result = ValidationResult()
+    root_path = project_root(root)
+
+    try:
+        entries = load_targets_config(root_path)
+    except Exception as exc:
+        result.add_error(f"Failed to load targets.yaml: {exc}")
+        return result
+
+    seen_ids: set[str] = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            result.add_error(f"Target entry at index {index} must be a mapping")
+            continue
+
+        target_id = entry.get("target_id")
+        if not target_id or not isinstance(target_id, str):
+            result.add_error(f"Target entry at index {index} missing target_id")
+            continue
+
+        if target_id in seen_ids:
+            result.add_error(f"Duplicate target_id: {target_id}")
+        seen_ids.add(target_id)
+
+        if "criteria" not in entry:
+            result.add_error(f"Target {target_id} missing criteria")
+        elif not isinstance(entry["criteria"], dict):
+            result.add_error(f"Target {target_id} criteria must be a mapping")
+
+        if "enabled" in entry and not isinstance(entry["enabled"], bool):
+            result.add_error(f"Target {target_id} enabled must be boolean")
+
+    try:
+        load_targets(root_path)
+    except Exception as exc:
+        result.add_error(f"Target parsing failed: {exc}")
+
+    return result
+
+
+def validate_settings(root: Path | None = None) -> ValidationResult:
+    """Validate settings.yaml."""
+    result = ValidationResult()
+    try:
+        settings = load_settings(root)
+    except Exception as exc:
+        result.add_error(f"Failed to load settings.yaml: {exc}")
+        return result
+
+    if "timezone" not in settings:
+        result.add_warning("settings.yaml missing timezone; default America/Toronto will be used")
+
+    storage = settings.get("storage", {})
+    if storage and not isinstance(storage, dict):
+        result.add_error("settings.storage must be a mapping")
+
+    return result
+
+
+def validate_config(root: Path | None = None) -> ValidationResult:
+    """Validate all configuration files."""
+    targets_result = validate_targets_config(root)
+    settings_result = validate_settings(root)
+
+    combined = ValidationResult()
+    combined.ok = targets_result.ok and settings_result.ok
+    combined.errors = targets_result.errors + settings_result.errors
+    combined.warnings = targets_result.warnings + settings_result.warnings
+    return combined
+
+
+def _validate_csv_headers(path: Path, expected: list[str], result: ValidationResult, label: str) -> None:
+    if not path.exists():
+        result.add_error(f"Missing {label}: {path}")
+        return
+    with path.open("r", encoding="utf-8") as handle:
+        first_line = handle.readline().strip()
+    if not first_line:
+        result.add_warning(f"Empty {label}: {path}")
+        return
+    actual = [h.strip() for h in first_line.split(",")]
+    if actual != expected:
+        result.add_error(f"{label} header mismatch in {path}: expected {expected}, got {actual}")
+
+
+def validate_target_data(root: Path, target_id: str) -> ValidationResult:
+    """Validate on-disk data for a single target."""
+    result = ValidationResult()
+    target_root = root / "data" / "targets" / target_id
+
+    if not target_root.is_dir():
+        result.add_error(f"Target data directory missing: {target_root}")
+        return result
+
+    for filename in REQUIRED_TARGET_FILES:
+        path = target_root / filename
+        if not path.exists():
+            result.add_error(f"Missing required file for {target_id}: {filename}")
+
+    _validate_csv_headers(
+        vehicles_path(root, target_id), VEHICLES_HEADERS, result, f"{target_id} vehicles.csv"
+    )
+    _validate_csv_headers(
+        observations_path(root, target_id), OBSERVATIONS_HEADERS, result, f"{target_id} observations.csv"
+    )
+    _validate_csv_headers(
+        events_path(root, target_id), EVENTS_HEADERS, result, f"{target_id} listing_events.csv"
+    )
+
+    inv_path = inventory_path(root, target_id)
+    if inv_path.exists():
+        try:
+            with inv_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if data.get("target_id") != target_id:
+                result.add_error(f"Inventory target_id mismatch in {inv_path}")
+            if "vehicles" not in data or not isinstance(data["vehicles"], list):
+                result.add_error(f"Inventory missing vehicles list in {inv_path}")
+        except json.JSONDecodeError as exc:
+            result.add_error(f"Invalid JSON in {inv_path}: {exc}")
+
+    vehicles = read_csv_rows(vehicles_path(root, target_id))
+    vins_seen: set[str] = set()
+    for row in vehicles:
+        vin = row.get("vin", "").strip()
+        if not vin:
+            result.add_error(f"{target_id}: vehicle row missing VIN")
+            continue
+        if vin in vins_seen:
+            result.add_error(f"{target_id}: duplicate VIN in vehicles.csv: {vin}")
+        vins_seen.add(vin)
+
+    return result
+
+
+def validate_repository(root: Path | None = None) -> ValidationResult:
+    """Validate full repository consistency."""
+    result = ValidationResult()
+    root_path = project_root(root)
+
+    config_result = validate_config(root_path)
+    result.errors.extend(config_result.errors)
+    result.warnings.extend(config_result.warnings)
+    if not config_result.ok:
+        result.ok = False
+
+    registry = registry_path(root_path)
+    if not registry.exists():
+        result.add_warning(f"Registry missing: {registry}")
+    else:
+        _validate_csv_headers(registry, REGISTRY_HEADERS, result, "targets registry")
+
+    try:
+        targets = load_targets(root_path)
+    except Exception:
+        return result
+
+    for target in targets:
+        target_result = validate_target_data(root_path, target.target_id)
+        result.errors.extend(target_result.errors)
+        result.warnings.extend(target_result.warnings)
+        if not target_result.ok:
+            result.ok = False
+
+    daily_root = root_path / "reports" / "daily"
+    snapshots_root = root_path / "snapshots"
+    for target in targets:
+        if not (daily_root / target.target_id).is_dir():
+            result.add_warning(f"Daily report directory missing for {target.target_id}")
+        if not (snapshots_root / target.target_id).is_dir():
+            result.add_warning(f"Snapshot directory missing for {target.target_id}")
+
+    return result
