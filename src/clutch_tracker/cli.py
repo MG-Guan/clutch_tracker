@@ -11,6 +11,7 @@ from pathlib import Path
 from clutch_tracker.comparison import import_scan
 from clutch_tracker.config import load_settings, load_targets, project_root
 from clutch_tracker.criteria import build_search_criteria, format_criteria_summary
+from clutch_tracker.doctor import run_doctor
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.target_manager import initialize_targets
 from clutch_tracker.validation import validate_config, validate_repository
@@ -99,6 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("list-targets", help="List configured targets with search criteria")
+    sub.add_parser("doctor", help="Diagnose Python environment and package install")
     sub.add_parser("validate-config", help="Validate configuration files")
     sub.add_parser("initialize-targets", help="Initialize target data directories")
     sub.add_parser("validate-repository", help="Validate repository data integrity")
@@ -124,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
 
     commands = {
         "list-targets": lambda: cmd_list_targets(root),
+        "doctor": lambda: run_doctor(),
         "show-target": lambda: cmd_show_target(root, args.target_id),
         "validate-config": lambda: cmd_validate_config(root),
         "initialize-targets": lambda: cmd_initialize_targets(root),

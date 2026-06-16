@@ -26,6 +26,8 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["clutch_tracker*"]
+namespaces = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -87,16 +87,34 @@ pip install -e ".[dev]"
 Verify the install:
 
 ```bash
-python -m clutch_tracker.cli list-targets
-# or
+clutch-tracker doctor
 clutch-tracker list-targets
+# or
+python -m clutch_tracker list-targets
 ```
 
 ### Troubleshooting
 
-**`ModuleNotFoundError: No module named 'clutch_tracker'`**
+**`ModuleNotFoundError: No module named 'clutch_tracker'` (sometimes works, sometimes fails)**
 
-The package is not installed in your active environment. Activate your venv and run `pip install -e ".[dev]"` from the repo root. Creating a venv alone is not enough — editable install registers the `src/clutch_tracker` package.
+This is usually caused by **Conda `(base)` conflicting with `.venv`**, or a stale **`clutch_tracker/` folder at repo root** shadowing the real package under `src/`.
+
+Fix:
+
+```bash
+conda deactivate          # repeat until (base) disappears from your prompt
+source .venv/bin/activate
+pip install -e ".[dev]"
+clutch-tracker doctor
+```
+
+**Fallback without pip install** (always works from repo root):
+
+```bash
+python run.py list-targets
+```
+
+**Do not** keep an old `clutch_tracker/` directory at the repo root — only `src/clutch_tracker/` should exist.
 
 **`province=True` in list-targets output**
 
@@ -110,26 +128,21 @@ province: ON     # wrong — becomes true
 ## CLI usage
 
 ```bash
-# List configured targets (includes make/model summary)
-python -m clutch_tracker.cli list-targets
+# Recommended (after pip install -e ".[dev]")
+clutch-tracker list-targets
+clutch-tracker doctor
+clutch-tracker show-target ford-f150-ontario
+clutch-tracker validate-config
+clutch-tracker initialize-targets
+clutch-tracker import-scan tests/fixtures/scan_complete.json
+clutch-tracker generate-report --target ford-f150-ontario
+clutch-tracker validate-repository
 
-# Show full search criteria JSON for a target (for browser agents)
-python -m clutch_tracker.cli show-target ford-f150-ontario
+# Or via Python module
+python -m clutch_tracker list-targets
 
-# Validate configuration
-python -m clutch_tracker.cli validate-config
-
-# Create on-disk directories and empty data files
-python -m clutch_tracker.cli initialize-targets
-
-# Import a browser scan
-python -m clutch_tracker.cli import-scan tests/fixtures/scan_complete.json
-
-# Generate a daily report
-python -m clutch_tracker.cli generate-report --target ford-f150-ontario
-
-# Validate repository integrity
-python -m clutch_tracker.cli validate-repository
+# Fallback without pip install (from repo root)
+python run.py list-targets
 ```
 
 ## Configuration
