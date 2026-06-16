@@ -32,6 +32,25 @@ def test_parse_target_criteria():
     assert target.criteria.extra == {"custom_field": "value"}
 
 
+def test_load_targets_province_is_string_not_yaml_boolean():
+    targets = load_targets(project_root())
+    ford = next(t for t in targets if t.target_id == "ford-f150-ontario")
+    assert ford.criteria.province == "ON"
+    assert isinstance(ford.criteria.province, str)
+
+
+def test_parse_target_rejects_unquoted_on_province():
+    import pytest
+
+    with pytest.raises(ValueError, match="YAML boolean"):
+        parse_target(
+            {
+                "target_id": "bad-province",
+                "criteria": {"province": True},
+            }
+        )
+
+
 def test_validate_config_passes():
     result = validate_config(project_root())
     assert result.ok, result.errors

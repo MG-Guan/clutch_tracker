@@ -53,6 +53,20 @@ def load_targets_config(root: Path | None = None) -> list[dict[str, Any]]:
     return targets
 
 
+def _parse_province(value: Any, target_id: str) -> str | None:
+    """Parse province code; reject YAML boolean coercion (ON/OFF)."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError(
+            f"Target {target_id!r}: province {value!r} looks like a YAML boolean. "
+            'Quote province codes in targets.yaml (e.g. province: "ON").'
+        )
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Target {target_id!r}: province must be a non-empty string")
+    return value.strip()
+
+
 def parse_target(entry: dict[str, Any]) -> Target:
     """Parse a single target config entry into a Target model."""
     target_id = entry.get("target_id")
@@ -96,7 +110,7 @@ def parse_target(entry: dict[str, Any]) -> Target:
 
     criteria = TargetCriteria(
         body_style=criteria_raw.get("body_style"),
-        province=criteria_raw.get("province"),
+        province=_parse_province(criteria_raw.get("province"), target_id),
         min_year=criteria_raw.get("min_year"),
         max_year=criteria_raw.get("max_year"),
         make=criteria_raw.get("make"),

@@ -21,6 +21,9 @@ dev = [
 [project.scripts]
 clutch-tracker = "clutch_tracker.cli:main"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

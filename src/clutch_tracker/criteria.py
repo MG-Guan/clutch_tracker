@@ -119,9 +119,9 @@ def format_criteria_summary(criteria: TargetCriteria) -> str:
         parts.append(f"model={criteria.model}")
     if criteria.model_aliases:
         parts.append(f"aliases={','.join(criteria.model_aliases)}")
-    if criteria.body_style:
+    if criteria.body_style is not None:
         parts.append(f"body={criteria.body_style}")
-    if criteria.province:
+    if criteria.province is not None:
         parts.append(f"province={criteria.province}")
     if criteria.min_year is not None or criteria.max_year is not None:
         parts.append(f"years={criteria.min_year or '?'}-{criteria.max_year or '?'}")

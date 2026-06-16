@@ -76,10 +76,35 @@ data/registry/targets.csv    # Target metadata registry
 
 ## Installation
 
+From the repository root (where `pyproject.toml` lives):
+
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
+```
+
+Verify the install:
+
+```bash
+python -m clutch_tracker.cli list-targets
+# or
+clutch-tracker list-targets
+```
+
+### Troubleshooting
+
+**`ModuleNotFoundError: No module named 'clutch_tracker'`**
+
+The package is not installed in your active environment. Activate your venv and run `pip install -e ".[dev]"` from the repo root. Creating a venv alone is not enough — editable install registers the `src/clutch_tracker` package.
+
+**`province=True` in list-targets output**
+
+YAML parses unquoted `ON` / `OFF` as booleans. Always quote province codes in `config/targets.yaml`:
+
+```yaml
+province: "ON"   # correct
+province: ON     # wrong — becomes true
 ```
 
 ## CLI usage
@@ -125,7 +150,7 @@ Define search targets with unique `target_id` values and criteria. Vehicle makes
     model_aliases:       # alternate spellings (F150, F 150, …)
       - F150
       - F 150
-    province: ON
+    province: "ON"
     min_year: 2019
     max_year: 2024
     search_query: "Ford F-150"   # optional Clutch.ca search box text
