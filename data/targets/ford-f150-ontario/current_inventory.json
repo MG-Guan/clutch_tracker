@@ -1,11 +1,11 @@
 {
   "scan_complete": false,
-  "scan_id": "clutch_ford_f150_ontario_20260616_002527",
+  "scan_id": "clutch_ford_f150_ontario_20260616_170800",
   "target_id": "ford-f150-ontario",
-  "updated_at": "2026-06-16T00:25:27-04:00",
+  "updated_at": "2026-06-16T17:08:00-04:00",
   "vehicles": [
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "104836",
       "listing_url": "https://www.clutch.ca/vehicles/104836",
       "make": "Ford",
@@ -18,7 +18,7 @@
       "year": "2023"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "95745",
       "listing_url": "https://www.clutch.ca/vehicles/95745",
       "make": "Ford",
@@ -44,7 +44,7 @@
       "year": "2023"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "98122",
       "listing_url": "https://www.clutch.ca/vehicles/98122",
       "make": "Ford",
@@ -57,20 +57,46 @@
       "year": "2022"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "103912",
+      "listing_url": "https://www.clutch.ca/vehicles/103912",
+      "make": "Ford",
+      "mileage_km": "60000",
+      "model": "F-150",
+      "price_cad": "44390",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vin": "1FTEW1EP7NFB17238",
+      "year": "2022"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "105080",
+      "listing_url": "https://www.clutch.ca/vehicles/105080",
+      "make": "Ford",
+      "mileage_km": "53406",
+      "model": "F-150",
+      "price_cad": "51790",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vin": "1FTEW1EPXPFC35464",
+      "year": "2023"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "102032",
       "listing_url": "https://www.clutch.ca/vehicles/102032",
       "make": "Ford",
       "mileage_km": "36488",
       "model": "F-150",
-      "price_cad": "54190",
+      "price_cad": "53890",
       "status": "active",
       "trim": "XLT 302A Crew Cab Short Bed",
       "vin": "1FTEW1EPXPKD47088",
       "year": "2023"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "106923",
       "listing_url": "https://www.clutch.ca/vehicles/106923",
       "make": "Ford",
@@ -83,7 +109,7 @@
       "year": "2024"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "105262",
       "listing_url": "https://www.clutch.ca/vehicles/105262",
       "make": "Ford",
@@ -96,7 +122,7 @@
       "year": "2024"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "101717",
       "listing_url": "https://www.clutch.ca/vehicles/101717",
       "make": "Ford",
@@ -109,7 +135,20 @@
       "year": "2025"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "106415",
+      "listing_url": "https://www.clutch.ca/vehicles/106415",
+      "make": "Ford",
+      "mileage_km": "55585",
+      "model": "F-150",
+      "price_cad": "53490",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Standard Bed",
+      "vin": "1FTFW1E52PKE89874",
+      "year": "2023"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "107800",
       "listing_url": "https://www.clutch.ca/vehicles/107800",
       "make": "Ford",
@@ -122,7 +161,7 @@
       "year": "2021"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "104121",
       "listing_url": "https://www.clutch.ca/vehicles/104121",
       "make": "Ford",
@@ -135,7 +174,20 @@
       "year": "2022"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "103836",
+      "listing_url": "https://www.clutch.ca/vehicles/103836",
+      "make": "Ford",
+      "mileage_km": "84247",
+      "model": "F-150",
+      "price_cad": "43190",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vin": "1FTFW1E85NKD79392",
+      "year": "2022"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "101542",
       "listing_url": "https://www.clutch.ca/vehicles/101542",
       "make": "Ford",
@@ -146,6 +198,32 @@
       "trim": "XLT 302A Crew Cab Standard Bed",
       "vin": "1FTFW1E86NKD91289",
       "year": "2022"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "106890",
+      "listing_url": "https://www.clutch.ca/vehicles/106890",
+      "make": "Ford",
+      "mileage_km": "41017",
+      "model": "F-150",
+      "price_cad": "47090",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Standard Bed",
+      "vin": "1FTFW1E86NKE45819",
+      "year": "2022"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "108202",
+      "listing_url": "https://www.clutch.ca/vehicles/108202",
+      "make": "Ford",
+      "mileage_km": "53805",
+      "model": "F-150",
+      "price_cad": "51590",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vin": "1FTFW1E86PFC74145",
+      "year": "2023"
     },
     {
       "last_seen_at": "2026-06-16T00:25:27-04:00",
@@ -161,7 +239,7 @@
       "year": "2023"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "106118",
       "listing_url": "https://www.clutch.ca/vehicles/106118",
       "make": "Ford",
@@ -174,7 +252,7 @@
       "year": "2023"
     },
     {
-      "last_seen_at": "2026-06-16T00:25:27-04:00",
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
       "listing_id": "104904",
       "listing_url": "https://www.clutch.ca/vehicles/104904",
       "make": "Ford",
@@ -185,6 +263,19 @@
       "trim": "LARIAT 502A Crew Cab Standard Bed",
       "vin": "1FTFW1ED7NFB35619",
       "year": "2022"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "listing_id": "105561",
+      "listing_url": "https://www.clutch.ca/vehicles/105561",
+      "make": "Ford",
+      "mileage_km": "32504",
+      "model": "F-150",
+      "price_cad": "56890",
+      "status": "active",
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vin": "1FTFW3L85RFB45931",
+      "year": "2024"
     }
   ]
 }
