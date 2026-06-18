@@ -290,7 +290,14 @@ def _text_mentions_accident(text: str) -> bool:
 
 
 def _contains_any(text: str, phrases: set[str]) -> bool:
-    return any(phrase in text for phrase in phrases)
+    for phrase in phrases:
+        if " " in phrase:
+            if phrase in text:
+                return True
+            continue
+        if re.search(rf"\b{re.escape(phrase)}\b", text):
+            return True
+    return False
 
 
 def _parse_money(value: Any) -> float | None:
