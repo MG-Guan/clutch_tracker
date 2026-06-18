@@ -9,6 +9,7 @@ from typing import Any
 from clutch_tracker.accident_history import AccidentAssessment, assess_accident_history
 from clutch_tracker.config import load_settings, project_root
 from clutch_tracker.events import build_listing_events
+from clutch_tracker.maintenance_history import MaintenanceAssessment, assess_maintenance_history
 from clutch_tracker.models import (
     CurrentInventory,
     InventoryVehicle,
@@ -158,6 +159,12 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         accident_history_status=prev.accident_history_status,
         accident_severity=prev.accident_severity,
         accident_details=prev.accident_details,
+        maintenance_history_status=prev.maintenance_history_status,
+        maintenance_risk_level=prev.maintenance_risk_level,
+        maintenance_details=prev.maintenance_details,
+        maintenance_records_count=prev.maintenance_records_count,
+        maintenance_locations_count=prev.maintenance_locations_count,
+        maintenance_replaced_components_count=prev.maintenance_replaced_components_count,
         recommendation_eligible=prev.recommendation_eligible,
     )
 
@@ -173,8 +180,32 @@ def _merge_accident_assessment(
         status=previous.accident_history_status,
         severity=previous.accident_severity,
         details=previous.accident_details,
-        recommendation_eligible=previous.recommendation_eligible,
+        recommendation_eligible=_accident_recommendation_eligible(previous),
     )
+
+
+def _merge_maintenance_assessment(
+    scanned: ScanVehicle,
+    previous: InventoryVehicle | None,
+) -> MaintenanceAssessment:
+    assessment = assess_maintenance_history(scanned.extra)
+    if assessment.status != "unknown" or previous is None:
+        return assessment
+    return MaintenanceAssessment(
+        status=previous.maintenance_history_status,
+        risk_level=previous.maintenance_risk_level,
+        details=previous.maintenance_details,
+        records_count=previous.maintenance_records_count,
+        locations_count=previous.maintenance_locations_count,
+        replaced_components_count=previous.maintenance_replaced_components_count,
+        recommendation_eligible=previous.maintenance_risk_level != "high",
+    )
+
+
+def _accident_recommendation_eligible(vehicle: InventoryVehicle) -> bool:
+    if vehicle.accident_history_status != "reported":
+        return True
+    return vehicle.accident_severity == "minor"
 
 
 def _inventory_from_scan(
@@ -192,6 +223,7 @@ def _inventory_from_scan(
     for scanned in payload.vehicles:
         prev = previous_by_vin.get(scanned.vin)
         accident_assessment = _merge_accident_assessment(scanned, prev)
+        maintenance_assessment = _merge_maintenance_assessment(scanned, prev)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
             last_seen_at=payload.scanned_at,
@@ -207,7 +239,15 @@ def _inventory_from_scan(
             accident_history_status=accident_assessment.status,
             accident_severity=accident_assessment.severity,
             accident_details=accident_assessment.details,
-            recommendation_eligible=accident_assessment.recommendation_eligible,
+            maintenance_history_status=maintenance_assessment.status,
+            maintenance_risk_level=maintenance_assessment.risk_level,
+            maintenance_details=maintenance_assessment.details,
+            maintenance_records_count=maintenance_assessment.records_count,
+            maintenance_locations_count=maintenance_assessment.locations_count,
+            maintenance_replaced_components_count=maintenance_assessment.replaced_components_count,
+            recommendation_eligible=(
+                accident_assessment.recommendation_eligible and maintenance_assessment.recommendation_eligible
+            ),
         )
 
     if payload.scan_complete:
@@ -232,6 +272,12 @@ def _inventory_from_scan(
                     accident_history_status=prev.accident_history_status,
                     accident_severity=prev.accident_severity,
                     accident_details=prev.accident_details,
+                    maintenance_history_status=prev.maintenance_history_status,
+                    maintenance_risk_level=prev.maintenance_risk_level,
+                    maintenance_details=prev.maintenance_details,
+                    maintenance_records_count=prev.maintenance_records_count,
+                    maintenance_locations_count=prev.maintenance_locations_count,
+                    maintenance_replaced_components_count=prev.maintenance_replaced_components_count,
                     recommendation_eligible=prev.recommendation_eligible,
                 )
 
@@ -263,16 +309,18 @@ def _build_accident_history_events(
         if current is None:
             continue
         previous = previous_by_vin.get(scanned.vin)
+        current_accident_eligible = _accident_recommendation_eligible(current)
+        previous_accident_eligible = _accident_recommendation_eligible(previous) if previous else True
         if previous and (
             previous.accident_history_status,
             previous.accident_severity,
             previous.accident_details,
-            previous.recommendation_eligible,
+            previous_accident_eligible,
         ) == (
             current.accident_history_status,
             current.accident_severity,
             current.accident_details,
-            current.recommendation_eligible,
+            current_accident_eligible,
         ):
             continue
         events.append(
@@ -286,8 +334,67 @@ def _build_accident_history_events(
                 details={
                     "status": current.accident_history_status,
                     "severity": current.accident_severity,
-                    "recommendation_eligible": current.recommendation_eligible,
+                    "recommendation_eligible": current_accident_eligible,
                     "details": current.accident_details,
+                },
+            )
+        )
+    return events
+
+
+def _build_maintenance_history_events(
+    payload: ScanPayload,
+    previous_inventory: CurrentInventory | None,
+    new_inventory: CurrentInventory,
+) -> list[ListingEvent]:
+    previous_by_vin = {}
+    if previous_inventory:
+        previous_by_vin = {vehicle.vin: vehicle for vehicle in previous_inventory.vehicles}
+    current_by_vin = {vehicle.vin: vehicle for vehicle in new_inventory.vehicles}
+
+    events: list[ListingEvent] = []
+    for scanned in payload.vehicles:
+        assessment = assess_maintenance_history(scanned.extra)
+        if assessment.status == "unknown":
+            continue
+        current = current_by_vin.get(scanned.vin)
+        if current is None:
+            continue
+        previous = previous_by_vin.get(scanned.vin)
+        if previous and (
+            previous.maintenance_history_status,
+            previous.maintenance_risk_level,
+            previous.maintenance_details,
+            previous.maintenance_records_count,
+            previous.maintenance_locations_count,
+            previous.maintenance_replaced_components_count,
+            previous.maintenance_risk_level != "high",
+        ) == (
+            current.maintenance_history_status,
+            current.maintenance_risk_level,
+            current.maintenance_details,
+            current.maintenance_records_count,
+            current.maintenance_locations_count,
+            current.maintenance_replaced_components_count,
+            current.maintenance_risk_level != "high",
+        ):
+            continue
+        events.append(
+            ListingEvent(
+                event_id=new_id("evt"),
+                vin=scanned.vin,
+                target_id=payload.target_id,
+                event_type="maintenance_history_assessed",
+                event_at=payload.scanned_at,
+                scan_id=payload.scan_id,
+                details={
+                    "status": current.maintenance_history_status,
+                    "risk_level": current.maintenance_risk_level,
+                    "recommendation_eligible": current.maintenance_risk_level != "high",
+                    "records_count": current.maintenance_records_count,
+                    "locations_count": current.maintenance_locations_count,
+                    "replaced_components_count": current.maintenance_replaced_components_count,
+                    "details": current.maintenance_details,
                 },
             )
         )
@@ -331,6 +438,7 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         existing_before=previous_inventory.vehicles if previous_inventory else [],
     )
     events.extend(_build_accident_history_events(payload, previous_inventory, new_inventory))
+    events.extend(_build_maintenance_history_events(payload, previous_inventory, new_inventory))
     append_events(root_path, events)
     save_current_inventory(root_path, new_inventory)
 
@@ -346,6 +454,14 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         for assessment in assessments
         if assessment.status == "reported" and not assessment.recommendation_eligible
     )
+    maintenance_assessments = [assess_maintenance_history(vehicle.extra) for vehicle in payload.vehicles]
+    reported_maintenance_count = sum(
+        1 for assessment in maintenance_assessments if assessment.status != "unknown"
+    )
+    moderate_maintenance_count = sum(
+        1 for assessment in maintenance_assessments if assessment.risk_level == "moderate"
+    )
+    high_maintenance_count = sum(1 for assessment in maintenance_assessments if assessment.risk_level == "high")
 
     summary = {
         "target_id": payload.target_id,
@@ -355,6 +471,9 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         "vehicles_with_reported_accident_history": reported_accident_count,
         "vehicles_with_minor_accident_history": minor_accident_count,
         "vehicles_with_non_recommendable_accident_history": non_recommendable_accident_count,
+        "vehicles_with_reported_maintenance_history": reported_maintenance_count,
+        "vehicles_with_moderate_maintenance_risk": moderate_maintenance_count,
+        "vehicles_with_high_maintenance_risk": high_maintenance_count,
         "observations_added": len(observations),
         "events_added": len(events),
         "active_inventory": active_count,

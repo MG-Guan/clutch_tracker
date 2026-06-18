@@ -194,6 +194,8 @@ Use `--top N` to control how many picks appear per section (default: 3). Partial
 
 Vehicles with explicit accident-history data are still tracked. Reported accidents are excluded from recommendations unless the scan details clearly indicate a minor/simple repair (for example, cosmetic damage or a low repair cost).
 
+Browser agents may also include maintenance/service-history details in each vehicle object, such as `service_history`, `maintenance_records`, `service_locations`, `records_count`, `locations_count`, or `replaced_parts`. The importer normalizes those explicit fields into maintenance risk metadata in `current_inventory.json`, emits `maintenance_history_assessed` events when the assessment changes, and excludes high maintenance-risk listings from recommendation rankings while still showing them in the maintenance risk watchlist.
+
 ### `config/settings.yaml`
 
 Global settings: timezone, logging, reporting fields, and scan behavior.

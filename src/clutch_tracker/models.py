@@ -127,6 +127,12 @@ class InventoryVehicle:
     accident_history_status: str = "unknown"
     accident_severity: str = "unknown"
     accident_details: str | None = None
+    maintenance_history_status: str = "unknown"
+    maintenance_risk_level: str = "unknown"
+    maintenance_details: str | None = None
+    maintenance_records_count: int | None = None
+    maintenance_locations_count: int | None = None
+    maintenance_replaced_components_count: int | None = None
     recommendation_eligible: bool = True
 
 
