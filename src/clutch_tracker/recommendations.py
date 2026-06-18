@@ -40,6 +40,9 @@ class VehicleSnapshot:
     accident_history_status: str
     accident_severity: str
     accident_details: str | None
+    vehicle_history_report_status: str
+    vehicle_history_report_provider: str | None
+    vehicle_history_report_details: str | None
     maintenance_history_status: str
     maintenance_risk_level: str
     maintenance_details: str | None
@@ -61,6 +64,7 @@ class RankedPick:
     metric: str
     listing_url: str | None
     accident_history: str
+    vehicle_history_report: str
     maintenance_history: str
     first_seen_at: str | None = None
     days_listed: str | None = None
@@ -93,6 +97,10 @@ def generate_recommendations_report(
     active = _active_snapshots(inventory, vehicles)
     recommendable = [vehicle for vehicle in active if vehicle.recommendation_eligible]
     excluded = len(active) - len(recommendable)
+    scanned_history_reports = sum(1 for vehicle in active if vehicle.vehicle_history_report_status == "scanned")
+    failed_history_reports = sum(
+        1 for vehicle in active if vehicle.vehicle_history_report_status in {"blocked", "error", "unavailable"}
+    )
     high_maintenance_risk = sum(1 for vehicle in active if vehicle.maintenance_risk_level == "high")
     reference_at = inventory.updated_at if inventory else timestamp
 
@@ -105,6 +113,8 @@ def generate_recommendations_report(
         "",
         f"- Active listings analyzed: {len(recommendable)}",
         f"- Active listings tracked but excluded from recommendations: {excluded}",
+        f"- Active listings with scanned history reports: {scanned_history_reports}",
+        f"- Active listings with failed/unavailable history report scans: {failed_history_reports}",
         f"- Active listings with high maintenance risk: {high_maintenance_risk}",
         f"- Recommendations per dimension: top {top_n}",
         "",
@@ -167,6 +177,18 @@ def generate_recommendations_report(
             ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Maintenance", "Link"],
         ),
         (
+            "Accident Risk Watchlist",
+            "Reported accident/damage history among active listings, including vehicles excluded from recommendations.",
+            _rank_accident_risk(active, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "History Report", "Link"],
+        ),
+        (
+            "Vehicle History Scan Watchlist",
+            "Active listings whose full vehicle-history report was not successfully scanned.",
+            _rank_history_report_scan_gaps(active, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "History Report", "Accident", "Link"],
+        ),
+        (
             "Maintenance Risk Watchlist",
             "Known moderate/high maintenance complexity among active listings, including vehicles excluded from recommendations.",
             _rank_maintenance_risk(active, top_n),
@@ -212,6 +234,9 @@ def _active_snapshots(
                 accident_history_status=vehicle.accident_history_status,
                 accident_severity=vehicle.accident_severity,
                 accident_details=vehicle.accident_details,
+                vehicle_history_report_status=vehicle.vehicle_history_report_status,
+                vehicle_history_report_provider=vehicle.vehicle_history_report_provider,
+                vehicle_history_report_details=vehicle.vehicle_history_report_details,
                 maintenance_history_status=vehicle.maintenance_history_status,
                 maintenance_risk_level=vehicle.maintenance_risk_level,
                 maintenance_details=vehicle.maintenance_details,
@@ -254,6 +279,15 @@ def _format_accident_history(vehicle: VehicleSnapshot) -> str:
             return f"{vehicle.accident_severity}: {vehicle.accident_details}"
         return vehicle.accident_severity
     return vehicle.accident_history_status
+
+
+def _format_vehicle_history_report(vehicle: VehicleSnapshot) -> str:
+    parts = [vehicle.vehicle_history_report_status]
+    if vehicle.vehicle_history_report_provider:
+        parts.append(vehicle.vehicle_history_report_provider)
+    if vehicle.vehicle_history_report_details:
+        parts.append(vehicle.vehicle_history_report_details)
+    return "; ".join(parts)
 
 
 def _format_maintenance_history(vehicle: VehicleSnapshot) -> str:
@@ -304,6 +338,7 @@ def _rank_best_value(active: list[VehicleSnapshot], top_n: int) -> list[RankedPi
                 metric=f"{ratio:.2f}",
                 listing_url=vehicle.listing_url,
                 accident_history=_format_accident_history(vehicle),
+                vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
             )
         )
@@ -329,6 +364,7 @@ def _rank_lowest_price(active: list[VehicleSnapshot], top_n: int) -> list[Ranked
             metric=_display(vehicle.price_cad),
             listing_url=vehicle.listing_url,
             accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
             maintenance_history=_format_maintenance_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
@@ -354,6 +390,7 @@ def _rank_low_mileage(active: list[VehicleSnapshot], top_n: int) -> list[RankedP
             metric=_display(vehicle.mileage_km),
             listing_url=vehicle.listing_url,
             accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
             maintenance_history=_format_maintenance_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
@@ -386,6 +423,7 @@ def _rank_best_price_by_year(active: list[VehicleSnapshot], top_n: int) -> list[
                 metric=year,
                 listing_url=vehicle.listing_url,
                 accident_history=_format_accident_history(vehicle),
+                vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
             )
         )
@@ -417,6 +455,7 @@ def _rank_new_listings(
                 metric=first_seen_at,
                 listing_url=vehicle.listing_url,
                 accident_history=_format_accident_history(vehicle),
+                vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
                 first_seen_at=first_seen_at,
                 days_listed=str(days) if days is not None else "unknown",
@@ -473,6 +512,7 @@ def _rank_price_drops(
                 metric=f"-{int(drop)} CAD",
                 listing_url=vehicle.listing_url,
                 accident_history=_format_accident_history(vehicle),
+                vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
                 old_price_cad=f"{int(old_price)}",
                 new_price_cad=f"{int(new_price)}",
@@ -481,6 +521,65 @@ def _rank_price_drops(
             )
         )
     return picks
+
+
+def _rank_accident_risk(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+    severity_order = {"major": 0, "unknown": 1, "minor": 2}
+    candidates = [vehicle for vehicle in active if vehicle.accident_history_status == "reported"]
+    candidates.sort(
+        key=lambda vehicle: (
+            severity_order.get(vehicle.accident_severity, 1),
+            vehicle.accident_details or "",
+            vehicle.vin,
+        )
+    )
+
+    return [
+        RankedPick(
+            vin=vehicle.vin,
+            year=_display(vehicle.year),
+            trim=_display(vehicle.trim),
+            price_cad=_display(vehicle.price_cad),
+            mileage_km=_display(vehicle.mileage_km),
+            metric=vehicle.accident_severity,
+            listing_url=vehicle.listing_url,
+            accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
+            maintenance_history=_format_maintenance_history(vehicle),
+        )
+        for vehicle in candidates[:top_n]
+    ]
+
+
+def _rank_history_report_scan_gaps(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+    status_order = {"blocked": 0, "error": 1, "not_scanned": 2, "unavailable": 3}
+    candidates = [
+        vehicle
+        for vehicle in active
+        if vehicle.vehicle_history_report_status != "scanned"
+    ]
+    candidates.sort(
+        key=lambda vehicle: (
+            status_order.get(vehicle.vehicle_history_report_status, 4),
+            vehicle.vin,
+        )
+    )
+
+    return [
+        RankedPick(
+            vin=vehicle.vin,
+            year=_display(vehicle.year),
+            trim=_display(vehicle.trim),
+            price_cad=_display(vehicle.price_cad),
+            mileage_km=_display(vehicle.mileage_km),
+            metric=vehicle.vehicle_history_report_status,
+            listing_url=vehicle.listing_url,
+            accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
+            maintenance_history=_format_maintenance_history(vehicle),
+        )
+        for vehicle in candidates[:top_n]
+    ]
 
 
 def _rank_maintenance_risk(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
@@ -510,6 +609,7 @@ def _rank_maintenance_risk(active: list[VehicleSnapshot], top_n: int) -> list[Ra
             metric=vehicle.maintenance_risk_level,
             listing_url=vehicle.listing_url,
             accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
             maintenance_history=_format_maintenance_history(vehicle),
         )
         for vehicle in candidates[:top_n]
@@ -575,6 +675,30 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.metric,
                 pick.accident_history,
                 pick.maintenance_history,
+                _format_link(pick.listing_url),
+            ]
+        elif "History Report" in headers and headers.index("Accident") < headers.index("History Report"):
+            row = [
+                str(index),
+                pick.vin,
+                pick.year,
+                pick.trim,
+                pick.price_cad,
+                pick.mileage_km,
+                pick.accident_history,
+                pick.vehicle_history_report,
+                _format_link(pick.listing_url),
+            ]
+        elif "History Report" in headers and headers.index("History Report") < headers.index("Accident"):
+            row = [
+                str(index),
+                pick.vin,
+                pick.year,
+                pick.trim,
+                pick.price_cad,
+                pick.mileage_km,
+                pick.vehicle_history_report,
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         elif "Maintenance" in headers and headers.index("Maintenance") < headers.index("Accident"):

@@ -71,6 +71,11 @@ def test_build_search_criteria_for_f150_target():
     assert payload["criteria"]["model"] == "F-150"
     assert "F150" in payload["criteria"]["model_aliases"]
     assert "F-150" in payload["criteria"]["model_search_terms"]
+    history_requirement = payload["scan_requirements"]["vehicle_history_report"]
+    assert history_requirement["required"] is True
+    assert history_requirement["provider"] == "carfax"
+    assert history_requirement["output_field"] == "vehicle_history_report"
+    assert "accident_damage_records_count" in history_requirement["capture_fields"]
 
 
 def test_format_criteria_summary_includes_make_model():

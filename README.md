@@ -175,7 +175,54 @@ Define search targets with unique `target_id` values and criteria. Vehicle makes
     search_query: "Ford F-150"   # optional Clutch.ca search box text
 ```
 
-Browser agents should call `show-target <target_id>` to retrieve the full search payload including `model_search_terms`.
+Browser agents should call `show-target <target_id>` to retrieve the full search payload including `model_search_terms` and `scan_requirements`.
+
+### Browser-agent Carfax scanning
+
+`show-target` includes a `scan_requirements.vehicle_history_report` block. For each included vehicle, browser agents must open the vehicle detail page, go to the History section, follow the full Carfax report link when available, and write an explicit report object into the scan JSON. Python import code does not scrape Clutch or Carfax directly; it deterministically analyzes the browser agent's raw report fields.
+
+Recommended scan shape:
+
+```json
+{
+  "vin": "1FTFW1E50NFA12345",
+  "listing_id": "clutch-123",
+  "year": 2022,
+  "make": "Ford",
+  "model": "F-150",
+  "price_cad": 45000,
+  "mileage_km": 32000,
+  "vehicle_history_report": {
+    "provider": "carfax",
+    "status": "scanned",
+    "source_url": "https://...",
+    "summary": "Accident/Damage Records Found",
+    "accident_damage_records_count": 1,
+    "total_accident_damage_amount_cad": 7342,
+    "records": [
+      {
+        "date": "2024-04-10",
+        "location": "Ontario",
+        "type": "Accident Claim $5,000 - $9,999",
+        "details": "Damage reported to front",
+        "amount_cad": 7342
+      }
+    ]
+  }
+}
+```
+
+If the full report cannot be opened, agents must still record the attempt:
+
+```json
+"vehicle_history_report": {
+  "provider": "carfax",
+  "status": "blocked",
+  "details": "WAF/captcha prevented report access"
+}
+```
+
+Supported statuses are `scanned`, `blocked`, `error`, `unavailable`, and `not_scanned`. A scanned report with accident/damage records or positive claim amounts is tracked as reported accident history and is excluded from recommendation rankings unless details clearly indicate a minor/simple repair.
 
 ### Recommendations report
 
@@ -192,7 +239,7 @@ Browser agents should call `show-target <target_id>` to retrieve the full search
 
 Use `--top N` to control how many picks appear per section (default: 3). Partial scans (`scan_complete: false`) trigger a data-quality warning in the report.
 
-Vehicles with explicit accident-history data are still tracked. Reported accidents are excluded from recommendations unless the scan details clearly indicate a minor/simple repair (for example, cosmetic damage or a low repair cost).
+Vehicles with explicit accident-history data are still tracked. Reported accidents are excluded from recommendations unless the scan details clearly indicate a minor/simple repair (for example, cosmetic damage or a low repair cost). Excluded accident-risk vehicles remain visible in the recommendation report's Accident Risk Watchlist.
 
 Browser agents may also include maintenance/service-history details in each vehicle object, such as `service_history`, `maintenance_records`, `service_locations`, `records_count`, `locations_count`, or `replaced_parts`. The importer normalizes those explicit fields into maintenance risk metadata in `current_inventory.json`, emits `maintenance_history_assessed` events when the assessment changes, and excludes high maintenance-risk listings from recommendation rankings while still showing them in the maintenance risk watchlist.
 

@@ -100,6 +100,24 @@ def build_search_criteria(target: Target) -> dict[str, Any]:
         payload["criteria"]["model_aliases"] = list(c.model_aliases)
 
     payload["criteria"]["model_search_terms"] = model_search_terms(c)
+    payload["scan_requirements"] = {
+        "vehicle_history_report": {
+            "required": True,
+            "provider": "carfax",
+            "source": "Open the vehicle detail page History section and follow the full Carfax report link.",
+            "output_field": "vehicle_history_report",
+            "capture_fields": [
+                "status",
+                "provider",
+                "source_url",
+                "summary",
+                "accident_damage_records_count",
+                "total_accident_damage_amount_cad",
+                "records",
+            ],
+            "failure_statuses": ["blocked", "error", "unavailable"],
+        }
+    }
 
     if c.search_query is not None:
         payload["criteria"]["search_query"] = c.search_query

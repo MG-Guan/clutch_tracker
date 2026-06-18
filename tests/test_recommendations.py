@@ -43,6 +43,8 @@ def test_generate_recommendations_dimensions(project_copy: Path):
     assert "## Best Price by Year" in content
     assert "## New Listings" in content
     assert "## Recent Price Drops" in content
+    assert "## Accident Risk Watchlist" in content
+    assert "## Vehicle History Scan Watchlist" in content
     assert "1FTFW1E50NFA12345" in content
     assert "-1000" in content or "-1000 CAD" in content
 
@@ -77,9 +79,12 @@ def test_generate_recommendations_filters_non_recommendable_accidents(project_co
 
     assert "- Active listings analyzed: 1" in content
     assert "- Active listings tracked but excluded from recommendations: 1" in content
-    assert "VINSEVERE1234567" not in content
+    best_value = content.split("## Best Value (Price per km)", 1)[1].split("## Lowest Price", 1)[0]
+    assert "VINSEVERE1234567" not in best_value
     assert "VINMINOR12345678" in content
     assert "minor: carfax.accident_reported=True" in content
+    accident_watchlist = content.split("## Accident Risk Watchlist", 1)[1].split("## Vehicle History Scan Watchlist", 1)[0]
+    assert "VINSEVERE1234567" in accident_watchlist
 
 
 def test_generate_recommendations_flags_complex_maintenance(project_copy: Path):
