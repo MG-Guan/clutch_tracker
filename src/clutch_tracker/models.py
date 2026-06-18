@@ -124,6 +124,10 @@ class InventoryVehicle:
     price_cad: str | None = None
     mileage_km: str | None = None
     status: str = "active"
+    accident_history_status: str = "unknown"
+    accident_severity: str = "unknown"
+    accident_details: str | None = None
+    recommendation_eligible: bool = True
 
 
 @dataclass

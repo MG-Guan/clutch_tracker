@@ -37,6 +37,10 @@ class VehicleSnapshot:
     listing_url: str | None
     first_seen_at: str | None
     last_seen_at: str | None
+    accident_history_status: str
+    accident_severity: str
+    accident_details: str | None
+    recommendation_eligible: bool
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,7 @@ class RankedPick:
     mileage_km: str
     metric: str
     listing_url: str | None
+    accident_history: str
     first_seen_at: str | None = None
     days_listed: str | None = None
     old_price_cad: str | None = None
@@ -79,6 +84,8 @@ def generate_recommendations_report(
     report_path = report_dir / f"{date_part}.md"
 
     active = _active_snapshots(inventory, vehicles)
+    recommendable = [vehicle for vehicle in active if vehicle.recommendation_eligible]
+    accident_excluded = len(active) - len(recommendable)
     reference_at = inventory.updated_at if inventory else timestamp
 
     lines = [
@@ -88,7 +95,8 @@ def generate_recommendations_report(
         "",
         "## Summary",
         "",
-        f"- Active listings analyzed: {len(active)}",
+        f"- Active listings analyzed: {len(recommendable)}",
+        f"- Active listings tracked but excluded from recommendations: {accident_excluded}",
         f"- Recommendations per dimension: top {top_n}",
         "",
     ]
@@ -116,38 +124,38 @@ def generate_recommendations_report(
         (
             "Best Value (Price per km)",
             "Lower price-per-km is better. Only listings with known price and mileage are ranked.",
-            _rank_best_value(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "CAD/km", "Link"],
+            _rank_best_value(recommendable, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "CAD/km", "Accident", "Link"],
         ),
         (
             "Lowest Price",
             "Lowest current asking price among active listings.",
-            _rank_lowest_price(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Link"],
+            _rank_lowest_price(recommendable, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Link"],
         ),
         (
             "Low Mileage",
             "Lowest odometer reading among active listings.",
-            _rank_low_mileage(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Link"],
+            _rank_low_mileage(recommendable, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Link"],
         ),
         (
             "Best Price by Year",
             "Cheapest active listing within each model year (one pick per year).",
-            _rank_best_price_by_year(active, top_n),
-            ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Link"],
+            _rank_best_price_by_year(recommendable, top_n),
+            ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Link"],
         ),
         (
             "New Listings",
             "Most recently appeared listings (by first seen date).",
-            _rank_new_listings(active, reference_at, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Link"],
+            _rank_new_listings(recommendable, reference_at, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Accident", "Link"],
         ),
         (
             "Recent Price Drops",
             "Largest recent price reductions among currently active listings.",
-            _rank_price_drops(events, active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Link"],
+            _rank_price_drops(events, recommendable, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Link"],
         ),
     ]
 
@@ -186,6 +194,10 @@ def _active_snapshots(
                 listing_url=vehicle.listing_url or (reg.listing_url if reg else None),
                 first_seen_at=reg.first_seen_at if reg else None,
                 last_seen_at=vehicle.last_seen_at,
+                accident_history_status=vehicle.accident_history_status,
+                accident_severity=vehicle.accident_severity,
+                accident_details=vehicle.accident_details,
+                recommendation_eligible=vehicle.recommendation_eligible,
             )
         )
     return snapshots
@@ -213,6 +225,14 @@ def _format_link(url: str | None) -> str:
     if not url:
         return "—"
     return f"[view]({url})"
+
+
+def _format_accident_history(vehicle: VehicleSnapshot) -> str:
+    if vehicle.accident_history_status == "reported":
+        if vehicle.accident_details:
+            return f"{vehicle.accident_severity}: {vehicle.accident_details}"
+        return vehicle.accident_severity
+    return vehicle.accident_history_status
 
 
 def _days_between(start_iso: str | None, end_iso: str) -> int | None:
@@ -247,6 +267,7 @@ def _rank_best_value(active: list[VehicleSnapshot], top_n: int) -> list[RankedPi
                 mileage_km=_display(vehicle.mileage_km),
                 metric=f"{ratio:.2f}",
                 listing_url=vehicle.listing_url,
+                accident_history=_format_accident_history(vehicle),
             )
         )
     return picks
@@ -270,6 +291,7 @@ def _rank_lowest_price(active: list[VehicleSnapshot], top_n: int) -> list[Ranked
             mileage_km=_display(vehicle.mileage_km),
             metric=_display(vehicle.price_cad),
             listing_url=vehicle.listing_url,
+            accident_history=_format_accident_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
     ]
@@ -293,6 +315,7 @@ def _rank_low_mileage(active: list[VehicleSnapshot], top_n: int) -> list[RankedP
             mileage_km=_display(vehicle.mileage_km),
             metric=_display(vehicle.mileage_km),
             listing_url=vehicle.listing_url,
+            accident_history=_format_accident_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
     ]
@@ -323,6 +346,7 @@ def _rank_best_price_by_year(active: list[VehicleSnapshot], top_n: int) -> list[
                 mileage_km=_display(vehicle.mileage_km),
                 metric=year,
                 listing_url=vehicle.listing_url,
+                accident_history=_format_accident_history(vehicle),
             )
         )
     return picks
@@ -352,6 +376,7 @@ def _rank_new_listings(
                 mileage_km=_display(vehicle.mileage_km),
                 metric=first_seen_at,
                 listing_url=vehicle.listing_url,
+                accident_history=_format_accident_history(vehicle),
                 first_seen_at=first_seen_at,
                 days_listed=str(days) if days is not None else "unknown",
             )
@@ -406,6 +431,7 @@ def _rank_price_drops(
                 mileage_km=_display(vehicle.mileage_km),
                 metric=f"-{int(drop)} CAD",
                 listing_url=vehicle.listing_url,
+                accident_history=_format_accident_history(vehicle),
                 old_price_cad=f"{int(old_price)}",
                 new_price_cad=f"{int(new_price)}",
                 drop_cad=f"-{int(drop)}",
@@ -432,6 +458,7 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.trim,
                 pick.price_cad,
                 pick.mileage_km,
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         elif "Drop %" in headers:
@@ -444,6 +471,7 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.new_price_cad or "unknown",
                 pick.drop_cad or "unknown",
                 pick.drop_pct or "unknown",
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         elif "Days Listed" in headers:
@@ -455,6 +483,7 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.price_cad,
                 pick.first_seen_at or "unknown",
                 pick.days_listed or "unknown",
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         elif "CAD/km" in headers:
@@ -466,6 +495,7 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.price_cad,
                 pick.mileage_km,
                 pick.metric,
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         else:
@@ -476,6 +506,7 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.trim,
                 pick.price_cad,
                 pick.mileage_km,
+                pick.accident_history,
                 _format_link(pick.listing_url),
             ]
         lines.append("| " + " | ".join(row) + " |")

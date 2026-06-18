@@ -303,6 +303,10 @@ def load_current_inventory(root: Path, target_id: str) -> CurrentInventory | Non
             price_cad=v.get("price_cad"),
             mileage_km=v.get("mileage_km"),
             status=v.get("status", "active"),
+            accident_history_status=v.get("accident_history_status", "unknown"),
+            accident_severity=v.get("accident_severity", "unknown"),
+            accident_details=v.get("accident_details"),
+            recommendation_eligible=v.get("recommendation_eligible", True),
         )
         for v in data.get("vehicles", [])
     ]
@@ -335,6 +339,10 @@ def save_current_inventory(root: Path, inventory: CurrentInventory) -> None:
                 "price_cad": v.price_cad,
                 "mileage_km": v.mileage_km,
                 "status": v.status,
+                "accident_history_status": v.accident_history_status,
+                "accident_severity": v.accident_severity,
+                "accident_details": v.accident_details,
+                "recommendation_eligible": v.recommendation_eligible,
             }
             for v in sorted(inventory.vehicles, key=lambda x: x.vin)
         ],

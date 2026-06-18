@@ -45,3 +45,38 @@ def test_generate_recommendations_dimensions(project_copy: Path):
     assert "## Recent Price Drops" in content
     assert "1FTFW1E50NFA12345" in content
     assert "-1000" in content or "-1000 CAD" in content
+
+
+def test_generate_recommendations_filters_non_recommendable_accidents(project_copy: Path):
+    data = _load_fixture("scan_complete.json")
+    data["scan_id"] = "scan_accident_recommendations"
+    data["vehicles"] = [
+        {
+            **data["vehicles"][0],
+            "vin": "VINSEVERE1234567",
+            "price_cad": 1000,
+            "mileage_km": 1000,
+            "carfax": {"accident_reported": True},
+        },
+        {
+            **data["vehicles"][0],
+            "vin": "VINMINOR12345678",
+            "price_cad": 2000,
+            "mileage_km": 2000,
+            "carfax": {
+                "accident_reported": True,
+                "repair_description": "minor cosmetic bumper repair",
+                "repair_cost_cad": 900,
+            },
+        },
+    ]
+    import_scan(project_copy, data)
+
+    report_path = generate_recommendations_report(project_copy, "ford-f150-ontario", top_n=3)
+    content = report_path.read_text(encoding="utf-8")
+
+    assert "- Active listings analyzed: 1" in content
+    assert "- Active listings tracked but excluded from recommendations: 1" in content
+    assert "VINSEVERE1234567" not in content
+    assert "VINMINOR12345678" in content
+    assert "minor: carfax.accident_reported=True" in content
