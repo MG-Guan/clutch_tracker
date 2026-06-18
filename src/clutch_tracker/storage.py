@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 from zoneinfo import ZoneInfo
 
+from clutch_tracker.carfax import carfax_from_dict, carfax_to_dict
 from clutch_tracker.config import get_timezone_name, load_settings, project_root
 from clutch_tracker.models import (
     CurrentInventory,
@@ -51,7 +52,15 @@ OBSERVATIONS_HEADERS = [
     "make",
     "model",
     "trim",
+    "carfax_summary",
+    "carfax_accident_reported",
+    "carfax_commercial_use",
+    "carfax_service_records",
+    "carfax_json",
+    "raw_fields_json",
 ]
+
+LEGACY_OBSERVATIONS_HEADERS = OBSERVATIONS_HEADERS[:13]
 
 EVENTS_HEADERS = [
     "event_id",
@@ -227,6 +236,63 @@ def save_vehicles(root: Path, target_id: str, vehicles: dict[str, VehicleRecord]
     write_csv_rows(vehicles_path(root, target_id), VEHICLES_HEADERS, rows)
 
 
+def _bool_to_csv(value: bool | None) -> str:
+    if value is None:
+        return ""
+    return "true" if value else "false"
+
+
+def _csv_to_bool(value: str | None) -> bool | None:
+    if value is None or str(value).strip() == "":
+        return None
+    normalized = str(value).strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    return None
+
+
+def ensure_observations_schema(root: Path, target_id: str) -> None:
+    """Upgrade observations.csv to the current schema when needed."""
+    path = observations_path(root, target_id)
+    if not path.exists() or path.stat().st_size == 0:
+        return
+
+    with path.open("r", encoding="utf-8") as handle:
+        first_line = handle.readline().strip()
+    if not first_line:
+        return
+
+    actual = [h.strip() for h in first_line.split(",")]
+    if actual == OBSERVATIONS_HEADERS:
+        return
+
+    if actual != LEGACY_OBSERVATIONS_HEADERS:
+        logger.warning(
+            "observations.csv for %s has unexpected headers; skipping schema upgrade",
+            target_id,
+        )
+        return
+
+    rows = read_csv_rows(path)
+    upgraded = []
+    for row in rows:
+        upgraded.append(
+            {
+                **{header: row.get(header, "") for header in LEGACY_OBSERVATIONS_HEADERS},
+                "carfax_summary": "",
+                "carfax_accident_reported": "",
+                "carfax_commercial_use": "",
+                "carfax_service_records": "",
+                "carfax_json": "",
+                "raw_fields_json": "",
+            }
+        )
+    write_csv_rows(path, OBSERVATIONS_HEADERS, upgraded)
+    logger.info("Upgraded observations.csv schema for target %s", target_id)
+
+
 def append_observations(root: Path, observations: list[Observation]) -> None:
     """Append observations without overwriting history."""
     if not observations:
@@ -236,6 +302,7 @@ def append_observations(root: Path, observations: list[Observation]) -> None:
         by_target.setdefault(obs.target_id, []).append(obs)
 
     for tid, obs_list in by_target.items():
+        ensure_observations_schema(root, tid)
         rows = [
             {
                 "observation_id": o.observation_id,
@@ -251,6 +318,20 @@ def append_observations(root: Path, observations: list[Observation]) -> None:
                 "make": o.make,
                 "model": o.model,
                 "trim": o.trim,
+                "carfax_summary": o.carfax_summary,
+                "carfax_accident_reported": _bool_to_csv(
+                    o.carfax.accident_reported if o.carfax else None
+                ),
+                "carfax_commercial_use": _bool_to_csv(
+                    o.carfax.commercial_use if o.carfax else None
+                ),
+                "carfax_service_records": (
+                    o.carfax.service_record_count if o.carfax and o.carfax.service_record_count is not None else ""
+                ),
+                "carfax_json": json.dumps(carfax_to_dict(o.carfax), sort_keys=True)
+                if o.carfax is not None
+                else "",
+                "raw_fields_json": json.dumps(o.raw_fields, sort_keys=True) if o.raw_fields else "",
             }
             for o in obs_list
         ]
@@ -303,6 +384,8 @@ def load_current_inventory(root: Path, target_id: str) -> CurrentInventory | Non
             price_cad=v.get("price_cad"),
             mileage_km=v.get("mileage_km"),
             status=v.get("status", "active"),
+            carfax=carfax_from_dict(v.get("carfax")),
+            carfax_summary=v.get("carfax_summary"),
         )
         for v in data.get("vehicles", [])
     ]
@@ -335,6 +418,8 @@ def save_current_inventory(root: Path, inventory: CurrentInventory) -> None:
                 "price_cad": v.price_cad,
                 "mileage_km": v.mileage_km,
                 "status": v.status,
+                "carfax_summary": v.carfax_summary,
+                "carfax": carfax_to_dict(v.carfax) if v.carfax is not None else None,
             }
             for v in sorted(inventory.vehicles, key=lambda x: x.vin)
         ],

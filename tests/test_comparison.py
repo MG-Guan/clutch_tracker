@@ -92,3 +92,41 @@ def test_price_change_event(project_copy: Path):
     events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
     price_events = [e for e in events if e["event_type"] == "price_changed"]
     assert len(price_events) >= 1
+
+
+def test_import_persists_carfax_fields(project_copy: Path):
+    data = _load_fixture("scan_complete.json")
+    import_scan(project_copy, data)
+
+    observations = read_csv_rows(observations_path(project_copy, "ford-f150-ontario"))
+    assert len(observations) == 2
+    clean_row = next(row for row in observations if row["vin"] == "1FTFW1E50NFA12345")
+    assert clean_row["carfax_accident_reported"] == "false"
+    assert clean_row["carfax_commercial_use"] == "false"
+    assert clean_row["carfax_service_records"] == "8"
+    assert "Clean history" in clean_row["carfax_summary"]
+    assert clean_row["raw_fields_json"]
+    assert '"availability_status"' in clean_row["raw_fields_json"]
+
+    inventory = load_current_inventory(project_copy, "ford-f150-ontario")
+    clean_vehicle = next(v for v in inventory.vehicles if v.vin == "1FTFW1E50NFA12345")
+    assert clean_vehicle.carfax is not None
+    assert clean_vehicle.carfax_summary is not None
+    assert "Clean history" in clean_vehicle.carfax_summary
+
+
+def test_carfax_flag_changed_event(project_copy: Path):
+    complete = _load_fixture("scan_complete.json")
+    import_scan(project_copy, complete)
+
+    updated = _load_fixture("scan_complete.json")
+    updated["scan_id"] = "scan_carfax_change"
+    updated["scanned_at"] = "2026-06-16T12:00:00-04:00"
+    updated["vehicles"] = [updated["vehicles"][0]]
+    updated["vehicles"][0]["carfax"]["accident_reported"] = True
+    updated["vehicles"][0]["carfax"]["accident_count"] = 1
+    import_scan(project_copy, updated)
+
+    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    carfax_events = [e for e in events if e["event_type"] == "carfax_flag_changed"]
+    assert len(carfax_events) >= 1

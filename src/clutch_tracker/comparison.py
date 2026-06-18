@@ -6,7 +6,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from clutch_tracker.config import load_settings, project_root
+from clutch_tracker.carfax import parse_carfax, summarize_carfax, CarfaxReport
+from clutch_tracker.config import project_root
 from clutch_tracker.events import build_listing_events
 from clutch_tracker.models import (
     CurrentInventory,
@@ -63,8 +64,24 @@ def parse_scan_payload(data: dict[str, Any]) -> ScanPayload:
         if not vin or not isinstance(vin, str):
             raise ValueError(f"vehicles[{index}] must include string vin")
 
-        known = {"vin", "listing_id", "listing_url", "year", "make", "model", "trim", "price_cad", "mileage_km"}
+        known = {
+            "vin",
+            "listing_id",
+            "listing_url",
+            "year",
+            "make",
+            "model",
+            "trim",
+            "price_cad",
+            "mileage_km",
+            "carfax",
+        }
         extra = {k: v for k, v in item.items() if k not in known}
+        carfax_raw = item.get("carfax")
+        if carfax_raw is not None:
+            carfax = parse_carfax(carfax_raw)
+        else:
+            carfax = None
         vehicles.append(
             ScanVehicle(
                 vin=vin.strip().upper(),
@@ -77,6 +94,7 @@ def parse_scan_payload(data: dict[str, Any]) -> ScanPayload:
                 price_cad=item.get("price_cad"),
                 mileage_km=item.get("mileage_km"),
                 extra=extra,
+                carfax=carfax,
             )
         )
 
@@ -121,7 +139,18 @@ def _merge_vehicle_fields(existing: VehicleRecord | None, scanned: ScanVehicle, 
     )
 
 
+def _merge_carfax(
+    scanned: ScanVehicle,
+    previous: InventoryVehicle | None = None,
+) -> tuple[CarfaxReport | None, str | None]:
+    """Use scan Carfax when present; otherwise keep previous inventory Carfax."""
+    carfax = scanned.carfax if scanned.carfax is not None else (previous.carfax if previous else None)
+    summary = summarize_carfax(carfax)
+    return carfax, summary
+
+
 def _build_observation(scanned: ScanVehicle, payload: ScanPayload) -> Observation:
+    summary = summarize_carfax(scanned.carfax)
     return Observation(
         observation_id=new_id("obs"),
         vin=scanned.vin,
@@ -137,6 +166,8 @@ def _build_observation(scanned: ScanVehicle, payload: ScanPayload) -> Observatio
         model=scanned.model,
         trim=scanned.trim,
         raw_fields=scanned.extra,
+        carfax=scanned.carfax,
+        carfax_summary=summary,
     )
 
 
@@ -151,6 +182,7 @@ def _inventory_from_scan(payload: ScanPayload, previous: CurrentInventory | None
 
     for scanned in payload.vehicles:
         prev = previous_by_vin.get(scanned.vin)
+        carfax, carfax_summary = _merge_carfax(scanned, prev)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
             last_seen_at=payload.scanned_at,
@@ -163,6 +195,8 @@ def _inventory_from_scan(payload: ScanPayload, previous: CurrentInventory | None
             price_cad=normalize_optional_str(scanned.price_cad) or (prev.price_cad if prev else None),
             mileage_km=normalize_optional_str(scanned.mileage_km) or (prev.mileage_km if prev else None),
             status="active",
+            carfax=carfax,
+            carfax_summary=carfax_summary,
         )
 
     if payload.scan_complete:
@@ -180,6 +214,8 @@ def _inventory_from_scan(payload: ScanPayload, previous: CurrentInventory | None
                     price_cad=prev.price_cad,
                     mileage_km=prev.mileage_km,
                     status="removed",
+                    carfax=prev.carfax,
+                    carfax_summary=prev.carfax_summary,
                 )
     else:
         for prev in previous_by_vin.values():
@@ -196,6 +232,8 @@ def _inventory_from_scan(payload: ScanPayload, previous: CurrentInventory | None
                     price_cad=prev.price_cad,
                     mileage_km=prev.mileage_km,
                     status="active",
+                    carfax=prev.carfax,
+                    carfax_summary=prev.carfax_summary,
                 )
 
     return CurrentInventory(

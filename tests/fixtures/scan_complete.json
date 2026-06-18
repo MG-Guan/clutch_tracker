@@ -14,7 +14,18 @@
       "model": "F-150",
       "trim": "XLT",
       "price_cad": 45000,
-      "mileage_km": 32000
+      "mileage_km": 32000,
+      "availability_status": "start_purchase",
+      "carfax": {
+        "report_available": true,
+        "accident_reported": false,
+        "commercial_use": false,
+        "service_record_count": 8,
+        "ownership_count": 1,
+        "last_service_date": "2025-11-01",
+        "registration_provinces": ["ON"],
+        "raw_highlights": ["No accidents reported", "Regular maintenance"]
+      }
     },
     {
       "vin": "2C3CCAAG5JH123456",
@@ -22,7 +33,14 @@
       "year": 2021,
       "make": "Chrysler",
       "model": "300",
-      "price_cad": 28000
+      "price_cad": 28000,
+      "carfax": {
+        "report_available": true,
+        "accident_reported": true,
+        "accident_count": 1,
+        "commercial_use": true,
+        "service_record_count": 3
+      }
     }
   ]
 }

@@ -107,6 +107,47 @@ def build_search_criteria(target: Target) -> dict[str, Any]:
     if c.extra:
         payload["criteria"]["extra"] = dict(c.extra)
 
+    payload["scan_vehicle_schema"] = {
+        "required": ["vin"],
+        "listing_fields": [
+            "listing_id",
+            "listing_url",
+            "year",
+            "make",
+            "model",
+            "trim",
+            "price_cad",
+            "mileage_km",
+        ],
+        "carfax": {
+            "description": "Structured Carfax findings from the listing detail page",
+            "fields": {
+                "report_available": "bool",
+                "report_url": "string",
+                "accident_reported": "bool",
+                "accident_count": "int",
+                "damage_reported": "bool",
+                "commercial_use": "bool",
+                "rental_use": "bool",
+                "taxi_use": "bool",
+                "salvage_title": "bool",
+                "rebuilt_title": "bool",
+                "flood_damage": "bool",
+                "lemon": "bool",
+                "stolen": "bool",
+                "total_loss": "bool",
+                "service_record_count": "int",
+                "ownership_count": "int",
+                "last_service_date": "ISO date string",
+                "registration_provinces": "list[string]",
+                "odometer_rollback": "bool",
+                "import_vehicle": "bool",
+                "notes": "string",
+                "raw_highlights": "list[string]",
+            },
+        },
+    }
+
     return payload
 
 

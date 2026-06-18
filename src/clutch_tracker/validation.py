@@ -10,9 +10,11 @@ from pathlib import Path
 from clutch_tracker.config import load_settings, load_targets, load_targets_config, project_root
 from clutch_tracker.storage import (
     EVENTS_HEADERS,
+    LEGACY_OBSERVATIONS_HEADERS,
     OBSERVATIONS_HEADERS,
     REGISTRY_HEADERS,
     VEHICLES_HEADERS,
+    ensure_observations_schema,
     events_path,
     inventory_path,
     observations_path,
@@ -146,8 +148,14 @@ def _validate_csv_headers(path: Path, expected: list[str], result: ValidationRes
         result.add_warning(f"Empty {label}: {path}")
         return
     actual = [h.strip() for h in first_line.split(",")]
-    if actual != expected:
-        result.add_error(f"{label} header mismatch in {path}: expected {expected}, got {actual}")
+    if actual == expected:
+        return
+    if label.endswith("observations.csv") and actual == LEGACY_OBSERVATIONS_HEADERS:
+        result.add_warning(
+            f"{label} uses legacy headers; run import-scan or initialize-targets to upgrade schema"
+        )
+        return
+    result.add_error(f"{label} header mismatch in {path}: expected {expected}, got {actual}")
 
 
 def validate_target_data(root: Path, target_id: str) -> ValidationResult:
@@ -163,6 +171,8 @@ def validate_target_data(root: Path, target_id: str) -> ValidationResult:
         path = target_root / filename
         if not path.exists():
             result.add_error(f"Missing required file for {target_id}: {filename}")
+
+    ensure_observations_schema(root, target_id)
 
     _validate_csv_headers(
         vehicles_path(root, target_id), VEHICLES_HEADERS, result, f"{target_id} vehicles.csv"

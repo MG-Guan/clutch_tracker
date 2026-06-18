@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from clutch_tracker.carfax import carfax_field_changes, carfax_to_dict, summarize_carfax
 from clutch_tracker.models import InventoryVehicle, ListingEvent, ScanPayload
 from clutch_tracker.storage import new_id, normalize_optional_str
 
@@ -37,6 +38,14 @@ def build_listing_events(
 
     for vin, vehicle in new_active.items():
         if vin not in prev_active:
+            details: dict[str, object] = {
+                "listing_id": vehicle.listing_id,
+                "price_cad": vehicle.price_cad,
+            }
+            if vehicle.carfax_summary:
+                details["carfax_summary"] = vehicle.carfax_summary
+            if vehicle.carfax is not None:
+                details["carfax"] = carfax_to_dict(vehicle.carfax)
             events.append(
                 ListingEvent(
                     event_id=new_id("evt"),
@@ -45,10 +54,7 @@ def build_listing_events(
                     event_type="listing_appeared",
                     event_at=payload.scanned_at,
                     scan_id=payload.scan_id,
-                    details={
-                        "listing_id": vehicle.listing_id,
-                        "price_cad": vehicle.price_cad,
-                    },
+                    details=details,
                 )
             )
             continue
@@ -66,6 +72,25 @@ def build_listing_events(
                     event_at=payload.scanned_at,
                     scan_id=payload.scan_id,
                     details={"old_price_cad": prev_price, "new_price_cad": new_price},
+                )
+            )
+
+        for change in carfax_field_changes(prev.carfax, vehicle.carfax):
+            details = {
+                "field": change["field"],
+                "old_value": change["old_value"],
+                "new_value": change["new_value"],
+                "carfax_summary": summarize_carfax(vehicle.carfax),
+            }
+            events.append(
+                ListingEvent(
+                    event_id=new_id("evt"),
+                    vin=vin,
+                    target_id=payload.target_id,
+                    event_type="carfax_flag_changed",
+                    event_at=payload.scanned_at,
+                    scan_id=payload.scan_id,
+                    details=details,
                 )
             )
 

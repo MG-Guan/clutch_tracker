@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from clutch_tracker.carfax import is_clean_history
 from clutch_tracker.config import project_root
 from clutch_tracker.models import CurrentInventory, InventoryVehicle, VehicleRecord
 from clutch_tracker.storage import (
@@ -37,6 +38,8 @@ class VehicleSnapshot:
     listing_url: str | None
     first_seen_at: str | None
     last_seen_at: str | None
+    carfax_summary: str | None = None
+    clean_history: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,7 @@ def generate_recommendations_report(
 
     active = _active_snapshots(inventory, vehicles)
     reference_at = inventory.updated_at if inventory else timestamp
+    clean_active = [vehicle for vehicle in active if vehicle.clean_history is True]
 
     lines = [
         f"# Recommendations: {target_id}",
@@ -89,6 +93,7 @@ def generate_recommendations_report(
         "## Summary",
         "",
         f"- Active listings analyzed: {len(active)}",
+        f"- Clean Carfax history listings: {len(clean_active)}",
         f"- Recommendations per dimension: top {top_n}",
         "",
     ]
@@ -149,6 +154,18 @@ def generate_recommendations_report(
             _rank_price_drops(events, active, top_n),
             ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Link"],
         ),
+        (
+            "Clean History (No Carfax Risk Flags)",
+            "Active listings with known clean Carfax history (no accidents, commercial use, salvage, flood, etc.).",
+            _rank_clean_history(clean_active, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Carfax Summary", "Link"],
+        ),
+        (
+            "Best Value (Clean History)",
+            "Lowest price-per-km among listings with clean Carfax history.",
+            _rank_best_value(clean_active, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "CAD/km", "Link"],
+        ),
     ]
 
     for title, description, picks, headers in sections:
@@ -186,6 +203,8 @@ def _active_snapshots(
                 listing_url=vehicle.listing_url or (reg.listing_url if reg else None),
                 first_seen_at=reg.first_seen_at if reg else None,
                 last_seen_at=vehicle.last_seen_at,
+                carfax_summary=vehicle.carfax_summary,
+                clean_history=is_clean_history(vehicle.carfax),
             )
         )
     return snapshots
@@ -415,6 +434,24 @@ def _rank_price_drops(
     return picks
 
 
+def _rank_clean_history(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+    ranked = sorted(active, key=lambda vehicle: _parse_positive_number(vehicle.price_cad) or float("inf"))
+    picks: list[RankedPick] = []
+    for vehicle in ranked[:top_n]:
+        picks.append(
+            RankedPick(
+                vin=vehicle.vin,
+                year=_display(vehicle.year),
+                trim=_display(vehicle.trim),
+                price_cad=_display(vehicle.price_cad),
+                mileage_km=_display(vehicle.mileage_km),
+                metric=_display(vehicle.carfax_summary, "clean history"),
+                listing_url=vehicle.listing_url,
+            )
+        )
+    return picks
+
+
 def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
     if not picks:
         return ["_No qualifying listings._"]
@@ -432,6 +469,17 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.trim,
                 pick.price_cad,
                 pick.mileage_km,
+                _format_link(pick.listing_url),
+            ]
+        elif "Carfax Summary" in headers:
+            row = [
+                str(index),
+                pick.vin,
+                pick.year,
+                pick.trim,
+                pick.price_cad,
+                pick.mileage_km,
+                pick.metric,
                 _format_link(pick.listing_url),
             ]
         elif "Drop %" in headers:

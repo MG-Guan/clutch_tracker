@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from clutch_tracker.carfax import CarfaxReport
+
 
 @dataclass(frozen=True)
 class TargetCriteria:
@@ -65,6 +67,8 @@ class Observation:
     model: str | None = None
     trim: str | None = None
     raw_fields: dict[str, Any] = field(default_factory=dict)
+    carfax: CarfaxReport | None = None
+    carfax_summary: str | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +98,7 @@ class ScanVehicle:
     price_cad: int | float | str | None = None
     mileage_km: int | float | str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
+    carfax: CarfaxReport | None = None
 
 
 @dataclass(frozen=True)
@@ -124,6 +129,8 @@ class InventoryVehicle:
     price_cad: str | None = None
     mileage_km: str | None = None
     status: str = "active"
+    carfax: CarfaxReport | None = None
+    carfax_summary: str | None = None
 
 
 @dataclass

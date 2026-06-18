@@ -81,11 +81,47 @@ criteria:
       "make": "Ford",
       "model": "F-150",
       "price_cad": 45000,
-      "mileage_km": 32000
+      "mileage_km": 32000,
+      "availability_status": "start_purchase",
+      "carfax": {
+        "report_available": true,
+        "accident_reported": false,
+        "commercial_use": false,
+        "rental_use": false,
+        "service_record_count": 12,
+        "ownership_count": 2,
+        "last_service_date": "2025-03-15",
+        "registration_provinces": ["ON"],
+        "raw_highlights": ["No accidents reported", "12 service records"]
+      }
     }
   ]
 }
 ```
+
+### Carfax analysis in scans
+
+Browser agents should collect a structured `carfax` object on each vehicle when the listing exposes Carfax data. Unknown values must be omitted — do not guess.
+
+| Field | Meaning |
+|-------|---------|
+| `accident_reported` | Whether Carfax reports any accident |
+| `accident_count` | Number of reported accidents |
+| `commercial_use` / `rental_use` / `taxi_use` | Prior commercial/rental/taxi usage |
+| `service_record_count` | Number of maintenance/service records |
+| `ownership_count` | Number of previous owners |
+| `last_service_date` | Most recent service date (ISO date) |
+| `salvage_title` / `rebuilt_title` / `flood_damage` / `total_loss` | Major risk flags |
+| `raw_highlights` | Verbatim Carfax highlight strings from the page |
+
+`import-scan` will:
+
+- Persist Carfax fields to `observations.csv` (`carfax_summary`, key flags, `carfax_json`)
+- Store latest Carfax state on `current_inventory.json`
+- Emit `carfax_flag_changed` events when tracked flags change between scans
+- Include Carfax summaries in daily reports and recommendations (clean-history sections)
+
+Call `show-target <target_id>` to retrieve `scan_vehicle_schema` with the full Carfax field list.
 
 ## Data Layout
 
