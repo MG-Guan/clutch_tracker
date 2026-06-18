@@ -298,12 +298,12 @@ def _risk_level(
 
 def _flatten(value: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
     if isinstance(value, dict):
-        rows: list[tuple[tuple[str, ...], Any]] = []
+        rows: list[tuple[tuple[str, ...], Any]] = [(path, value)] if path else []
         for key, child in value.items():
             rows.extend(_flatten(child, path + (str(key),)))
         return rows
     if isinstance(value, list):
-        rows = []
+        rows = [(path, value)]
         for index, child in enumerate(value):
             rows.extend(_flatten(child, path + (str(index),)))
         return rows
