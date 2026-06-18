@@ -73,7 +73,7 @@ def test_save_and_load_vehicles(project_copy: Path):
     assert vehicles_path(project_copy, target_id).exists()
 
 
-def test_save_and_load_inventory_accident_metadata(project_copy: Path):
+def test_save_and_load_inventory_risk_metadata(project_copy: Path):
     target_id = "ford-f150-ontario"
     inventory = CurrentInventory(
         target_id=target_id,
@@ -87,7 +87,13 @@ def test_save_and_load_inventory_accident_metadata(project_copy: Path):
                 accident_history_status="reported",
                 accident_severity="minor",
                 accident_details="minor bumper repair",
-                recommendation_eligible=True,
+                maintenance_history_status="complex",
+                maintenance_risk_level="high",
+                maintenance_details="service records span multiple locations",
+                maintenance_records_count=10,
+                maintenance_locations_count=3,
+                maintenance_replaced_components_count=4,
+                recommendation_eligible=False,
             )
         ],
     )
@@ -100,4 +106,10 @@ def test_save_and_load_inventory_accident_metadata(project_copy: Path):
     assert vehicle.accident_history_status == "reported"
     assert vehicle.accident_severity == "minor"
     assert vehicle.accident_details == "minor bumper repair"
-    assert vehicle.recommendation_eligible is True
+    assert vehicle.maintenance_history_status == "complex"
+    assert vehicle.maintenance_risk_level == "high"
+    assert vehicle.maintenance_details == "service records span multiple locations"
+    assert vehicle.maintenance_records_count == 10
+    assert vehicle.maintenance_locations_count == 3
+    assert vehicle.maintenance_replaced_components_count == 4
+    assert vehicle.recommendation_eligible is False

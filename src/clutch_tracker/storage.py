@@ -306,6 +306,12 @@ def load_current_inventory(root: Path, target_id: str) -> CurrentInventory | Non
             accident_history_status=v.get("accident_history_status", "unknown"),
             accident_severity=v.get("accident_severity", "unknown"),
             accident_details=v.get("accident_details"),
+            maintenance_history_status=v.get("maintenance_history_status", "unknown"),
+            maintenance_risk_level=v.get("maintenance_risk_level", "unknown"),
+            maintenance_details=v.get("maintenance_details"),
+            maintenance_records_count=_optional_int(v.get("maintenance_records_count")),
+            maintenance_locations_count=_optional_int(v.get("maintenance_locations_count")),
+            maintenance_replaced_components_count=_optional_int(v.get("maintenance_replaced_components_count")),
             recommendation_eligible=v.get("recommendation_eligible", True),
         )
         for v in data.get("vehicles", [])
@@ -342,6 +348,12 @@ def save_current_inventory(root: Path, inventory: CurrentInventory) -> None:
                 "accident_history_status": v.accident_history_status,
                 "accident_severity": v.accident_severity,
                 "accident_details": v.accident_details,
+                "maintenance_history_status": v.maintenance_history_status,
+                "maintenance_risk_level": v.maintenance_risk_level,
+                "maintenance_details": v.maintenance_details,
+                "maintenance_records_count": v.maintenance_records_count,
+                "maintenance_locations_count": v.maintenance_locations_count,
+                "maintenance_replaced_components_count": v.maintenance_replaced_components_count,
                 "recommendation_eligible": v.recommendation_eligible,
             }
             for v in sorted(inventory.vehicles, key=lambda x: x.vin)
@@ -365,3 +377,12 @@ def normalize_optional_str(value: Any) -> str | None:
     if isinstance(value, str) and value.strip() == "":
         return None
     return str(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
