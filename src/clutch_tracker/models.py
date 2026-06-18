@@ -127,6 +127,9 @@ class InventoryVehicle:
     accident_history_status: str = "unknown"
     accident_severity: str = "unknown"
     accident_details: str | None = None
+    vehicle_history_report_status: str = "not_scanned"
+    vehicle_history_report_provider: str | None = None
+    vehicle_history_report_details: str | None = None
     maintenance_history_status: str = "unknown"
     maintenance_risk_level: str = "unknown"
     maintenance_details: str | None = None

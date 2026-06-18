@@ -144,6 +144,66 @@ def test_minor_accident_history_remains_recommendation_eligible(project_copy: Pa
     assert summary["vehicles_with_non_recommendable_accident_history"] == 0
 
 
+def test_import_records_scanned_carfax_accident_damage_report(project_copy: Path):
+    data = _load_fixture("scan_complete.json")
+    data["scan_id"] = "scan_carfax_accident_damage_report"
+    data["vehicles"][0]["vehicle_history_report"] = {
+        "provider": "carfax",
+        "status": "scanned",
+        "source_url": "https://carfax.example/report/1FTFW1E50NFA12345",
+        "summary": "Accident/Damage Records Found",
+        "accident_damage_records_count": 1,
+        "total_accident_damage_amount_cad": 7342,
+        "records": [
+            {
+                "date": "2024-04-10",
+                "location": "Ontario",
+                "type": "Accident Claim $5,000 - $9,999",
+                "details": "Damage reported to front",
+                "amount_cad": 7342,
+            }
+        ],
+    }
+
+    summary = import_scan(project_copy, data)
+
+    inventory = load_current_inventory(project_copy, "ford-f150-ontario")
+    assert inventory is not None
+    vehicle = next(v for v in inventory.vehicles if v.vin == "1FTFW1E50NFA12345")
+    assert vehicle.accident_history_status == "reported"
+    assert vehicle.accident_severity == "major"
+    assert vehicle.vehicle_history_report_status == "scanned"
+    assert vehicle.vehicle_history_report_provider == "carfax"
+    assert vehicle.recommendation_eligible is False
+    assert summary["vehicles_with_reported_accident_history"] == 1
+    assert summary["vehicles_with_non_recommendable_accident_history"] == 1
+    assert summary["vehicles_with_scanned_history_reports"] == 1
+
+    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    assert any(e["event_type"] == "accident_history_assessed" for e in events)
+    assert any(e["event_type"] == "vehicle_history_report_checked" for e in events)
+
+
+def test_partial_scan_preserves_previous_vehicle_history_report(project_copy: Path):
+    complete = _load_fixture("scan_complete.json")
+    complete["vehicles"][0]["vehicle_history_report"] = {
+        "provider": "carfax",
+        "status": "scanned",
+        "summary": "No accident/damage records found",
+    }
+    import_scan(project_copy, complete)
+
+    partial = _load_fixture("scan_partial.json")
+    summary = import_scan(project_copy, partial)
+
+    inventory = load_current_inventory(project_copy, "ford-f150-ontario")
+    assert inventory is not None
+    by_vin = {v.vin: v for v in inventory.vehicles}
+    assert by_vin["1FTFW1E50NFA12345"].vehicle_history_report_status == "scanned"
+    assert by_vin["1FTFW1E50NFA12345"].vehicle_history_report_provider == "carfax"
+    assert summary["vehicles_with_scanned_history_reports"] == 0
+
+
 def test_import_records_complex_maintenance_history(project_copy: Path):
     data = _load_fixture("scan_complete.json")
     data["scan_id"] = "scan_complex_maintenance_history"

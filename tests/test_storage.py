@@ -87,6 +87,9 @@ def test_save_and_load_inventory_risk_metadata(project_copy: Path):
                 accident_history_status="reported",
                 accident_severity="minor",
                 accident_details="minor bumper repair",
+                vehicle_history_report_status="scanned",
+                vehicle_history_report_provider="carfax",
+                vehicle_history_report_details="source_url=https://example.test/carfax",
                 maintenance_history_status="complex",
                 maintenance_risk_level="high",
                 maintenance_details="service records span multiple locations",
@@ -106,6 +109,9 @@ def test_save_and_load_inventory_risk_metadata(project_copy: Path):
     assert vehicle.accident_history_status == "reported"
     assert vehicle.accident_severity == "minor"
     assert vehicle.accident_details == "minor bumper repair"
+    assert vehicle.vehicle_history_report_status == "scanned"
+    assert vehicle.vehicle_history_report_provider == "carfax"
+    assert vehicle.vehicle_history_report_details == "source_url=https://example.test/carfax"
     assert vehicle.maintenance_history_status == "complex"
     assert vehicle.maintenance_risk_level == "high"
     assert vehicle.maintenance_details == "service records span multiple locations"

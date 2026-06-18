@@ -6,7 +6,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from clutch_tracker.accident_history import AccidentAssessment, assess_accident_history
+from clutch_tracker.accident_history import (
+    AccidentAssessment,
+    VehicleHistoryReportAssessment,
+    assess_accident_history,
+    assess_vehicle_history_report,
+)
 from clutch_tracker.config import load_settings, project_root
 from clutch_tracker.events import build_listing_events
 from clutch_tracker.maintenance_history import MaintenanceAssessment, assess_maintenance_history
@@ -159,6 +164,9 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         accident_history_status=prev.accident_history_status,
         accident_severity=prev.accident_severity,
         accident_details=prev.accident_details,
+        vehicle_history_report_status=prev.vehicle_history_report_status,
+        vehicle_history_report_provider=prev.vehicle_history_report_provider,
+        vehicle_history_report_details=prev.vehicle_history_report_details,
         maintenance_history_status=prev.maintenance_history_status,
         maintenance_risk_level=prev.maintenance_risk_level,
         maintenance_details=prev.maintenance_details,
@@ -202,6 +210,20 @@ def _merge_maintenance_assessment(
     )
 
 
+def _merge_vehicle_history_report_assessment(
+    scanned: ScanVehicle,
+    previous: InventoryVehicle | None,
+) -> VehicleHistoryReportAssessment:
+    assessment = assess_vehicle_history_report(scanned.extra)
+    if assessment.status != "not_scanned" or previous is None:
+        return assessment
+    return VehicleHistoryReportAssessment(
+        status=previous.vehicle_history_report_status,
+        provider=previous.vehicle_history_report_provider,
+        details=previous.vehicle_history_report_details,
+    )
+
+
 def _accident_recommendation_eligible(vehicle: InventoryVehicle) -> bool:
     if vehicle.accident_history_status != "reported":
         return True
@@ -223,6 +245,7 @@ def _inventory_from_scan(
     for scanned in payload.vehicles:
         prev = previous_by_vin.get(scanned.vin)
         accident_assessment = _merge_accident_assessment(scanned, prev)
+        history_report_assessment = _merge_vehicle_history_report_assessment(scanned, prev)
         maintenance_assessment = _merge_maintenance_assessment(scanned, prev)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
@@ -239,6 +262,9 @@ def _inventory_from_scan(
             accident_history_status=accident_assessment.status,
             accident_severity=accident_assessment.severity,
             accident_details=accident_assessment.details,
+            vehicle_history_report_status=history_report_assessment.status,
+            vehicle_history_report_provider=history_report_assessment.provider,
+            vehicle_history_report_details=history_report_assessment.details,
             maintenance_history_status=maintenance_assessment.status,
             maintenance_risk_level=maintenance_assessment.risk_level,
             maintenance_details=maintenance_assessment.details,
@@ -272,6 +298,9 @@ def _inventory_from_scan(
                     accident_history_status=prev.accident_history_status,
                     accident_severity=prev.accident_severity,
                     accident_details=prev.accident_details,
+                    vehicle_history_report_status=prev.vehicle_history_report_status,
+                    vehicle_history_report_provider=prev.vehicle_history_report_provider,
+                    vehicle_history_report_details=prev.vehicle_history_report_details,
                     maintenance_history_status=prev.maintenance_history_status,
                     maintenance_risk_level=prev.maintenance_risk_level,
                     maintenance_details=prev.maintenance_details,
@@ -336,6 +365,53 @@ def _build_accident_history_events(
                     "severity": current.accident_severity,
                     "recommendation_eligible": current_accident_eligible,
                     "details": current.accident_details,
+                },
+            )
+        )
+    return events
+
+
+def _build_vehicle_history_report_events(
+    payload: ScanPayload,
+    previous_inventory: CurrentInventory | None,
+    new_inventory: CurrentInventory,
+) -> list[ListingEvent]:
+    previous_by_vin = {}
+    if previous_inventory:
+        previous_by_vin = {vehicle.vin: vehicle for vehicle in previous_inventory.vehicles}
+    current_by_vin = {vehicle.vin: vehicle for vehicle in new_inventory.vehicles}
+
+    events: list[ListingEvent] = []
+    for scanned in payload.vehicles:
+        assessment = assess_vehicle_history_report(scanned.extra)
+        if assessment.status == "not_scanned":
+            continue
+        current = current_by_vin.get(scanned.vin)
+        if current is None:
+            continue
+        previous = previous_by_vin.get(scanned.vin)
+        if previous and (
+            previous.vehicle_history_report_status,
+            previous.vehicle_history_report_provider,
+            previous.vehicle_history_report_details,
+        ) == (
+            current.vehicle_history_report_status,
+            current.vehicle_history_report_provider,
+            current.vehicle_history_report_details,
+        ):
+            continue
+        events.append(
+            ListingEvent(
+                event_id=new_id("evt"),
+                vin=scanned.vin,
+                target_id=payload.target_id,
+                event_type="vehicle_history_report_checked",
+                event_at=payload.scanned_at,
+                scan_id=payload.scan_id,
+                details={
+                    "status": current.vehicle_history_report_status,
+                    "provider": current.vehicle_history_report_provider,
+                    "details": current.vehicle_history_report_details,
                 },
             )
         )
@@ -438,6 +514,7 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         existing_before=previous_inventory.vehicles if previous_inventory else [],
     )
     events.extend(_build_accident_history_events(payload, previous_inventory, new_inventory))
+    events.extend(_build_vehicle_history_report_events(payload, previous_inventory, new_inventory))
     events.extend(_build_maintenance_history_events(payload, previous_inventory, new_inventory))
     append_events(root_path, events)
     save_current_inventory(root_path, new_inventory)
@@ -462,6 +539,13 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         1 for assessment in maintenance_assessments if assessment.risk_level == "moderate"
     )
     high_maintenance_count = sum(1 for assessment in maintenance_assessments if assessment.risk_level == "high")
+    history_report_assessments = [assess_vehicle_history_report(vehicle.extra) for vehicle in payload.vehicles]
+    scanned_history_report_count = sum(
+        1 for assessment in history_report_assessments if assessment.status == "scanned"
+    )
+    failed_history_report_count = sum(
+        1 for assessment in history_report_assessments if assessment.status in {"blocked", "error", "unavailable"}
+    )
 
     summary = {
         "target_id": payload.target_id,
@@ -471,6 +555,8 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         "vehicles_with_reported_accident_history": reported_accident_count,
         "vehicles_with_minor_accident_history": minor_accident_count,
         "vehicles_with_non_recommendable_accident_history": non_recommendable_accident_count,
+        "vehicles_with_scanned_history_reports": scanned_history_report_count,
+        "vehicles_with_failed_history_report_scans": failed_history_report_count,
         "vehicles_with_reported_maintenance_history": reported_maintenance_count,
         "vehicles_with_moderate_maintenance_risk": moderate_maintenance_count,
         "vehicles_with_high_maintenance_risk": high_maintenance_count,
