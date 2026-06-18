@@ -46,7 +46,7 @@ def test_import_complete_scan(project_copy: Path):
     assert len(observations) == 2
 
 
-def test_import_excludes_carfax_accident_history(project_copy: Path):
+def test_import_records_carfax_accident_history_without_excluding(project_copy: Path):
     data = _load_fixture("scan_complete.json")
     data["scan_id"] = "scan_with_accident_history"
     data["vehicles"].append(
@@ -66,25 +66,35 @@ def test_import_excludes_carfax_accident_history(project_copy: Path):
     summary = import_scan(project_copy, data)
 
     assert summary["vehicles_scanned"] == 3
-    assert summary["vehicles_excluded_accident_history"] == 1
-    assert summary["observations_added"] == 2
-    assert summary["active_inventory"] == 2
+    assert summary["vehicles_with_reported_accident_history"] == 1
+    assert summary["vehicles_with_non_recommendable_accident_history"] == 1
+    assert summary["observations_added"] == 3
+    assert summary["active_inventory"] == 3
 
     inventory = load_current_inventory(project_copy, "ford-f150-ontario")
     assert inventory is not None
     assert {v.vin for v in inventory.vehicles if v.status == "active"} == {
         "1FTFW1E50NFA12345",
+        "1FTFW1E55NFA99999",
         "2C3CCAAG5JH123456",
     }
+    accident_vehicle = next(v for v in inventory.vehicles if v.vin == "1FTFW1E55NFA99999")
+    assert accident_vehicle.accident_history_status == "reported"
+    assert accident_vehicle.accident_severity == "unknown"
+    assert accident_vehicle.recommendation_eligible is False
 
     observations = read_csv_rows(observations_path(project_copy, "ford-f150-ontario"))
-    assert "1FTFW1E55NFA99999" not in {row["vin"] for row in observations}
+    assert "1FTFW1E55NFA99999" in {row["vin"] for row in observations}
+
+    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    accident_events = [e for e in events if e["event_type"] == "accident_history_assessed"]
+    assert len(accident_events) == 1
 
     archive = json.loads(raw_scan_archive_path(project_copy, "scan_with_accident_history").read_text(encoding="utf-8"))
     assert len(archive["vehicles"]) == 3
 
 
-def test_partial_scan_excludes_tracked_accident_history_vehicle(project_copy: Path):
+def test_partial_scan_records_tracked_accident_history_vehicle(project_copy: Path):
     complete = _load_fixture("scan_complete.json")
     import_scan(project_copy, complete)
 
@@ -103,11 +113,35 @@ def test_partial_scan_excludes_tracked_accident_history_vehicle(project_copy: Pa
     inventory = load_current_inventory(project_copy, "ford-f150-ontario")
     assert inventory is not None
     by_vin = {v.vin: v for v in inventory.vehicles}
-    assert by_vin["1FTFW1E50NFA12345"].status == "removed"
+    assert by_vin["1FTFW1E50NFA12345"].status == "active"
+    assert by_vin["1FTFW1E50NFA12345"].accident_history_status == "reported"
+    assert by_vin["1FTFW1E50NFA12345"].recommendation_eligible is False
     assert by_vin["2C3CCAAG5JH123456"].status == "active"
-    assert summary["vehicles_excluded_accident_history"] == 1
-    assert summary["active_inventory"] == 1
-    assert summary["removed_inventory"] == 1
+    assert summary["vehicles_with_reported_accident_history"] == 1
+    assert summary["active_inventory"] == 2
+    assert summary["removed_inventory"] == 0
+
+
+def test_minor_accident_history_remains_recommendation_eligible(project_copy: Path):
+    data = _load_fixture("scan_complete.json")
+    data["scan_id"] = "scan_minor_accident_history"
+    data["vehicles"][0]["carfax"] = {
+        "accident_reported": True,
+        "repair_description": "minor rear bumper cosmetic repair",
+        "repair_cost_cad": 1200,
+    }
+
+    summary = import_scan(project_copy, data)
+
+    inventory = load_current_inventory(project_copy, "ford-f150-ontario")
+    assert inventory is not None
+    vehicle = next(v for v in inventory.vehicles if v.vin == "1FTFW1E50NFA12345")
+    assert vehicle.accident_history_status == "reported"
+    assert vehicle.accident_severity == "minor"
+    assert vehicle.recommendation_eligible is True
+    assert summary["vehicles_with_reported_accident_history"] == 1
+    assert summary["vehicles_with_minor_accident_history"] == 1
+    assert summary["vehicles_with_non_recommendable_accident_history"] == 0
 
 
 def test_partial_scan_does_not_remove_vehicles(project_copy: Path):

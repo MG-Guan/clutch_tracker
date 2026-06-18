@@ -192,6 +192,8 @@ Browser agents should call `show-target <target_id>` to retrieve the full search
 
 Use `--top N` to control how many picks appear per section (default: 3). Partial scans (`scan_complete: false`) trigger a data-quality warning in the report.
 
+Vehicles with explicit accident-history data are still tracked. Reported accidents are excluded from recommendations unless the scan details clearly indicate a minor/simple repair (for example, cosmetic damage or a low repair cost).
+
 ### `config/settings.yaml`
 
 Global settings: timezone, logging, reporting fields, and scan behavior.

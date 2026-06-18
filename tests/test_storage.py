@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from clutch_tracker.models import Observation, VehicleRecord
+from clutch_tracker.models import CurrentInventory, InventoryVehicle, Observation, VehicleRecord
 from clutch_tracker.storage import (
     append_observations,
     atomic_write,
+    load_current_inventory,
     load_vehicles,
     now_iso,
     observations_path,
     read_csv_rows,
+    save_current_inventory,
     save_vehicles,
     vehicles_path,
 )
@@ -69,3 +71,33 @@ def test_save_and_load_vehicles(project_copy: Path):
     loaded = load_vehicles(project_copy, target_id)
     assert loaded["VIN123"].make == "TestMake"
     assert vehicles_path(project_copy, target_id).exists()
+
+
+def test_save_and_load_inventory_accident_metadata(project_copy: Path):
+    target_id = "ford-f150-ontario"
+    inventory = CurrentInventory(
+        target_id=target_id,
+        updated_at="2026-06-16T10:00:00-04:00",
+        scan_id="scan_accident_metadata",
+        scan_complete=True,
+        vehicles=[
+            InventoryVehicle(
+                vin="VINACCIDENT123",
+                last_seen_at="2026-06-16T10:00:00-04:00",
+                accident_history_status="reported",
+                accident_severity="minor",
+                accident_details="minor bumper repair",
+                recommendation_eligible=True,
+            )
+        ],
+    )
+
+    save_current_inventory(project_copy, inventory)
+    loaded = load_current_inventory(project_copy, target_id)
+
+    assert loaded is not None
+    vehicle = loaded.vehicles[0]
+    assert vehicle.accident_history_status == "reported"
+    assert vehicle.accident_severity == "minor"
+    assert vehicle.accident_details == "minor bumper repair"
+    assert vehicle.recommendation_eligible is True

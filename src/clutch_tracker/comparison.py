@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from clutch_tracker.accident_history import AccidentAssessment, assess_accident_history
 from clutch_tracker.config import load_settings, project_root
 from clutch_tracker.events import build_listing_events
 from clutch_tracker.models import (
     CurrentInventory,
     InventoryVehicle,
+    ListingEvent,
     Observation,
     ScanPayload,
     ScanVehicle,
@@ -32,75 +33,6 @@ from clutch_tracker.storage import (
 )
 
 logger = logging.getLogger(__name__)
-
-_ACCIDENT_POSITIVE_KEYS = {
-    "accident",
-    "accidenthistory",
-    "accidentreported",
-    "accidents",
-    "accidentsreported",
-    "accidentcount",
-    "accidentscount",
-    "carfaxaccident",
-    "carfaxaccidenthistory",
-    "carfaxaccidentreported",
-    "carfaxaccidents",
-    "carfaxhasaccident",
-    "carfaxhasaccidents",
-    "collision",
-    "collisionreported",
-    "damage",
-    "damagehistory",
-    "damagereported",
-    "hasaccident",
-    "hasaccidenthistory",
-    "hasaccidents",
-    "hascollision",
-    "hasdamage",
-    "hasdamagehistory",
-    "numberofaccidents",
-    "reportedaccidents",
-}
-_ACCIDENT_NEGATIVE_KEYS = {
-    "accidentfree",
-    "carfaxaccidentfree",
-    "noaccident",
-    "noaccidents",
-    "noaccidentsreported",
-}
-_ACCIDENT_FALSE_TEXT = {
-    "",
-    "0",
-    "0 accidents",
-    "accident free",
-    "clean",
-    "clean carfax",
-    "false",
-    "none",
-    "no",
-    "no accident",
-    "no accidents",
-    "no accidents reported",
-    "no collision",
-    "no damage",
-    "no reported accidents",
-    "not reported",
-    "unknown",
-}
-_ACCIDENT_TRUE_TEXT = {
-    "1",
-    "accident",
-    "accident reported",
-    "accidents reported",
-    "collision",
-    "collision reported",
-    "damage",
-    "damage reported",
-    "has accident",
-    "reported",
-    "true",
-    "yes",
-}
 
 
 def parse_scan_payload(data: dict[str, Any]) -> ScanPayload:
@@ -159,91 +91,6 @@ def parse_scan_payload(data: dict[str, Any]) -> ScanPayload:
         source=normalize_optional_str(data.get("source")),
         notes=normalize_optional_str(data.get("notes")),
     )
-
-
-def _normalize_history_key(key: Any) -> str:
-    return "".join(ch for ch in str(key).lower() if ch.isalnum())
-
-
-def _normalize_history_text(value: Any) -> str:
-    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
-
-
-def _history_value_indicates_accident(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value > 0
-    if isinstance(value, str):
-        text = _normalize_history_text(value)
-        if text in _ACCIDENT_FALSE_TEXT:
-            return False
-        if text in _ACCIDENT_TRUE_TEXT:
-            return True
-        if text.isdigit():
-            return int(text) > 0
-        if any(phrase in text for phrase in ("accident reported", "collision reported", "damage reported")):
-            return True
-    return False
-
-
-def _history_value_indicates_clean(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value > 0
-    if isinstance(value, str):
-        text = _normalize_history_text(value)
-        if text in _ACCIDENT_FALSE_TEXT:
-            return True
-        if text in _ACCIDENT_TRUE_TEXT:
-            return False
-    return False
-
-
-def _vehicle_has_reported_accident(vehicle: ScanVehicle) -> bool:
-    """Return True only when scan fields explicitly report accident history."""
-
-    def walk(value: Any, parent_key: str = "") -> bool:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                normalized_key = _normalize_history_key(key)
-                if normalized_key in _ACCIDENT_NEGATIVE_KEYS:
-                    if _history_value_indicates_clean(child):
-                        continue
-                    if isinstance(child, bool) and child is False:
-                        return True
-                elif normalized_key in _ACCIDENT_POSITIVE_KEYS:
-                    if _history_value_indicates_accident(child):
-                        return True
-                elif parent_key in {"carfax", "vehiclehistory"} and normalized_key in {
-                    "accident",
-                    "accidents",
-                    "accidenthistory",
-                    "collision",
-                    "damage",
-                    "damages",
-                }:
-                    if _history_value_indicates_accident(child):
-                        return True
-
-                if walk(child, normalized_key):
-                    return True
-        elif isinstance(value, list):
-            return any(walk(item, parent_key) for item in value)
-        return False
-
-    return walk(vehicle.extra)
-
-
-def _filter_accident_history_vehicles(
-    vehicles: list[ScanVehicle],
-) -> tuple[list[ScanVehicle], set[str]]:
-    excluded_vins = {vehicle.vin for vehicle in vehicles if _vehicle_has_reported_accident(vehicle)}
-    if not excluded_vins:
-        return vehicles, set()
-    eligible = [vehicle for vehicle in vehicles if vehicle.vin not in excluded_vins]
-    return eligible, excluded_vins
 
 
 def _merge_vehicle_fields(existing: VehicleRecord | None, scanned: ScanVehicle, observed_at: str, target_id: str) -> VehicleRecord:
@@ -308,17 +155,33 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         price_cad=prev.price_cad,
         mileage_km=prev.mileage_km,
         status="removed",
+        accident_history_status=prev.accident_history_status,
+        accident_severity=prev.accident_severity,
+        accident_details=prev.accident_details,
+        recommendation_eligible=prev.recommendation_eligible,
+    )
+
+
+def _merge_accident_assessment(
+    scanned: ScanVehicle,
+    previous: InventoryVehicle | None,
+) -> AccidentAssessment:
+    assessment = assess_accident_history(scanned.extra)
+    if assessment.status != "unknown" or previous is None:
+        return assessment
+    return AccidentAssessment(
+        status=previous.accident_history_status,
+        severity=previous.accident_severity,
+        details=previous.accident_details,
+        recommendation_eligible=previous.recommendation_eligible,
     )
 
 
 def _inventory_from_scan(
     payload: ScanPayload,
     previous: CurrentInventory | None,
-    *,
-    excluded_vins: set[str] | None = None,
 ) -> CurrentInventory:
     """Build updated inventory from scan results."""
-    excluded_vins = excluded_vins or set()
     previous_by_vin: dict[str, InventoryVehicle] = {}
     if previous:
         previous_by_vin = {v.vin: v for v in previous.vehicles}
@@ -328,6 +191,7 @@ def _inventory_from_scan(
 
     for scanned in payload.vehicles:
         prev = previous_by_vin.get(scanned.vin)
+        accident_assessment = _merge_accident_assessment(scanned, prev)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
             last_seen_at=payload.scanned_at,
@@ -340,6 +204,10 @@ def _inventory_from_scan(
             price_cad=normalize_optional_str(scanned.price_cad) or (prev.price_cad if prev else None),
             mileage_km=normalize_optional_str(scanned.mileage_km) or (prev.mileage_km if prev else None),
             status="active",
+            accident_history_status=accident_assessment.status,
+            accident_severity=accident_assessment.severity,
+            accident_details=accident_assessment.details,
+            recommendation_eligible=accident_assessment.recommendation_eligible,
         )
 
     if payload.scan_complete:
@@ -348,9 +216,7 @@ def _inventory_from_scan(
                 updated_by_vin[prev.vin] = _removed_inventory_vehicle(prev)
     else:
         for prev in previous_by_vin.values():
-            if prev.vin in excluded_vins and prev.status == "active":
-                updated_by_vin[prev.vin] = _removed_inventory_vehicle(prev)
-            elif prev.vin not in scanned_vins and prev.status == "active":
+            if prev.vin not in scanned_vins and prev.status == "active":
                 updated_by_vin[prev.vin] = InventoryVehicle(
                     vin=prev.vin,
                     last_seen_at=prev.last_seen_at,
@@ -363,6 +229,10 @@ def _inventory_from_scan(
                     price_cad=prev.price_cad,
                     mileage_km=prev.mileage_km,
                     status="active",
+                    accident_history_status=prev.accident_history_status,
+                    accident_severity=prev.accident_severity,
+                    accident_details=prev.accident_details,
+                    recommendation_eligible=prev.recommendation_eligible,
                 )
 
     return CurrentInventory(
@@ -374,6 +244,56 @@ def _inventory_from_scan(
     )
 
 
+def _build_accident_history_events(
+    payload: ScanPayload,
+    previous_inventory: CurrentInventory | None,
+    new_inventory: CurrentInventory,
+) -> list[ListingEvent]:
+    previous_by_vin = {}
+    if previous_inventory:
+        previous_by_vin = {vehicle.vin: vehicle for vehicle in previous_inventory.vehicles}
+    current_by_vin = {vehicle.vin: vehicle for vehicle in new_inventory.vehicles}
+
+    events: list[ListingEvent] = []
+    for scanned in payload.vehicles:
+        assessment = assess_accident_history(scanned.extra)
+        if assessment.status == "unknown":
+            continue
+        current = current_by_vin.get(scanned.vin)
+        if current is None:
+            continue
+        previous = previous_by_vin.get(scanned.vin)
+        if previous and (
+            previous.accident_history_status,
+            previous.accident_severity,
+            previous.accident_details,
+            previous.recommendation_eligible,
+        ) == (
+            current.accident_history_status,
+            current.accident_severity,
+            current.accident_details,
+            current.recommendation_eligible,
+        ):
+            continue
+        events.append(
+            ListingEvent(
+                event_id=new_id("evt"),
+                vin=scanned.vin,
+                target_id=payload.target_id,
+                event_type="accident_history_assessed",
+                event_at=payload.scanned_at,
+                scan_id=payload.scan_id,
+                details={
+                    "status": current.accident_history_status,
+                    "severity": current.accident_severity,
+                    "recommendation_eligible": current.recommendation_eligible,
+                    "details": current.accident_details,
+                },
+            )
+        )
+    return events
+
+
 def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     """
     Import a scan JSON payload and update deterministic history.
@@ -381,20 +301,11 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     Returns summary statistics about the import.
     """
     root_path = project_root(root)
-    raw_payload = parse_scan_payload(scan_data)
+    payload = parse_scan_payload(scan_data)
 
-    archive_path = raw_scan_archive_path(root_path, raw_payload.scan_id)
+    archive_path = raw_scan_archive_path(root_path, payload.scan_id)
     atomic_write_json(archive_path, scan_data)
     logger.info("Archived raw scan to %s", archive_path)
-
-    eligible_vehicles, excluded_vins = _filter_accident_history_vehicles(raw_payload.vehicles)
-    payload = replace(raw_payload, vehicles=eligible_vehicles)
-    if excluded_vins:
-        logger.info(
-            "Excluded %d vehicle(s) with reported accident history from scan %s",
-            len(excluded_vins),
-            raw_payload.scan_id,
-        )
 
     existing_vehicles = load_vehicles(root_path, payload.target_id)
     previous_inventory = load_current_inventory(root_path, payload.target_id)
@@ -412,25 +323,38 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     append_observations(root_path, observations)
     save_vehicles(root_path, payload.target_id, existing_vehicles)
 
-    new_inventory = _inventory_from_scan(payload, previous_inventory, excluded_vins=excluded_vins)
+    new_inventory = _inventory_from_scan(payload, previous_inventory)
     events = build_listing_events(
         payload,
         previous_inventory,
         new_inventory,
         existing_before=previous_inventory.vehicles if previous_inventory else [],
     )
+    events.extend(_build_accident_history_events(payload, previous_inventory, new_inventory))
     append_events(root_path, events)
     save_current_inventory(root_path, new_inventory)
 
     active_count = sum(1 for v in new_inventory.vehicles if v.status == "active")
     removed_count = sum(1 for v in new_inventory.vehicles if v.status == "removed")
+    assessments = [assess_accident_history(vehicle.extra) for vehicle in payload.vehicles]
+    reported_accident_count = sum(1 for assessment in assessments if assessment.status == "reported")
+    minor_accident_count = sum(
+        1 for assessment in assessments if assessment.status == "reported" and assessment.severity == "minor"
+    )
+    non_recommendable_accident_count = sum(
+        1
+        for assessment in assessments
+        if assessment.status == "reported" and not assessment.recommendation_eligible
+    )
 
     summary = {
         "target_id": payload.target_id,
         "scan_id": payload.scan_id,
         "scan_complete": payload.scan_complete,
-        "vehicles_scanned": len(raw_payload.vehicles),
-        "vehicles_excluded_accident_history": len(excluded_vins),
+        "vehicles_scanned": len(payload.vehicles),
+        "vehicles_with_reported_accident_history": reported_accident_count,
+        "vehicles_with_minor_accident_history": minor_accident_count,
+        "vehicles_with_non_recommendable_accident_history": non_recommendable_accident_count,
         "observations_added": len(observations),
         "events_added": len(events),
         "active_inventory": active_count,
