@@ -20,4 +20,4 @@ targets:
       province: "ON"
       min_year: 2021
       max_year: 2026
-      search_query: "Ford F-150"
+      search_query: "F-150"
