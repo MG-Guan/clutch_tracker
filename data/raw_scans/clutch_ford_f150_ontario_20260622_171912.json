@@ -1,0 +1,56 @@
+{
+  "discovered_listing_ids": [
+    "90298",
+    "84860"
+  ],
+  "notes": "Partial browser scan of Clutch.ca search results filtered to Ford F-150, model years 2021-2026, location Mississauga, Ontario. Clutch search is city/postal-code based rather than province-wide, so this does not prove complete Ontario inventory and must not infer removals for unscanned vehicles. Full Carfax reports were visible as available from Clutch pages but were not opened as complete report extracts; only visible page history summaries are recorded.",
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260622_171912",
+  "scanned_at": "2026-06-22T17:19:12-04:00",
+  "source": "Browser Agent manual Clutch.ca scan: search filters Ford F-150, years 2021-2026, Mississauga Ontario; detail pages verified for captured vehicles.",
+  "target_id": "ford-f150-ontario",
+  "vehicles": [
+    {
+      "last_registered_province": "ON",
+      "listing_id": "90298",
+      "listing_url": "https://www.clutch.ca/vehicles/90298",
+      "make": "Ford",
+      "mileage_km": 111306,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 38090,
+      "service_history": {
+        "replaced_parts": [
+          "brake pads",
+          "rotors"
+        ]
+      },
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "No accidents reported by Carfax; last registered in Ontario. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTEW1EPXPFA24040",
+      "year": 2023
+    },
+    {
+      "last_registered_province": "ON",
+      "listing_id": "84860",
+      "listing_url": "https://www.clutch.ca/vehicles/84860",
+      "make": "Ford",
+      "mileage_km": 125326,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 33590,
+      "trim": "XLT 301A Crew Cab Standard Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "No accidents reported by Carfax; last registered in Ontario. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTFW1E83PFA24247",
+      "year": 2023
+    }
+  ]
+}
