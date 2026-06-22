@@ -6,9 +6,12 @@ from clutch_tracker.config import load_targets, parse_target, project_root
 from clutch_tracker.criteria import (
     build_search_criteria,
     format_criteria_summary,
+    format_recommendation_preferences,
     model_search_terms,
     normalize_model_token,
+    parse_recommendation_preferences,
     vehicle_matches_criteria,
+    vehicle_matches_recommendation_preferences,
 )
 
 
@@ -76,6 +79,24 @@ def test_build_search_criteria_for_f150_target():
     assert history_requirement["provider"] == "carfax"
     assert history_requirement["output_field"] == "vehicle_history_report"
     assert "accident_damage_records_count" in history_requirement["capture_fields"]
+    prefs = payload["criteria"]["extra"]["recommendation_preferences"]
+    assert "502A" in prefs["trim_must_contain"]
+
+
+def test_parse_recommendation_preferences_from_target():
+    targets = {t.target_id: t for t in load_targets(project_root())}
+    preferences = parse_recommendation_preferences(targets["ford-f150-ontario"].criteria)
+    assert "502A" in preferences.trim_must_contain
+    assert vehicle_matches_recommendation_preferences(
+        "LARIAT 502A Crew Cab Short Bed",
+        preferences,
+    )
+    assert not vehicle_matches_recommendation_preferences(
+        "XLT 302A Crew Cab Short Bed",
+        preferences,
+    )
+    assert not vehicle_matches_recommendation_preferences(None, preferences)
+    assert format_recommendation_preferences(preferences).startswith("trim contains")
 
 
 def test_format_criteria_summary_includes_make_model():

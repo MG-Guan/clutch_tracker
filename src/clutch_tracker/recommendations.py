@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import json
 import logging
+import statistics
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from clutch_tracker.config import project_root
-from clutch_tracker.models import CurrentInventory, InventoryVehicle, VehicleRecord
+from clutch_tracker.config import load_targets, project_root
+from clutch_tracker.criteria import (
+    format_recommendation_preferences,
+    parse_recommendation_preferences,
+    vehicle_matches_recommendation_preferences,
+)
+from clutch_tracker.models import CurrentInventory, TargetCriteria, VehicleRecord
 from clutch_tracker.storage import (
     atomic_write,
     events_path,
@@ -87,6 +93,14 @@ def generate_recommendations_report(
     inventory = load_current_inventory(root_path, target_id)
     vehicles = load_vehicles(root_path, target_id)
     events = read_csv_rows(events_path(root_path, target_id))
+    targets_by_id = {target.target_id: target for target in load_targets(root_path)}
+    target = targets_by_id.get(target_id)
+    preferences = (
+        parse_recommendation_preferences(target.criteria)
+        if target is not None
+        else parse_recommendation_preferences(TargetCriteria())
+    )
+    preference_summary = format_recommendation_preferences(preferences)
 
     report_dir = recommendations_report_dir(root_path, target_id)
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +110,15 @@ def generate_recommendations_report(
 
     active = _active_snapshots(inventory, vehicles)
     recommendable = [vehicle for vehicle in active if vehicle.recommendation_eligible]
+    matched = [
+        vehicle
+        for vehicle in recommendable
+        if _matches_preferences(vehicle, preferences)
+    ]
+    matched_vins = {vehicle.vin for vehicle in matched}
+    outside_preferences = [
+        vehicle for vehicle in recommendable if vehicle.vin not in matched_vins
+    ]
     excluded = len(active) - len(recommendable)
     scanned_history_reports = sum(1 for vehicle in active if vehicle.vehicle_history_report_status == "scanned")
     failed_history_reports = sum(
@@ -112,6 +135,9 @@ def generate_recommendations_report(
         "## Summary",
         "",
         f"- Active listings analyzed: {len(recommendable)}",
+        f"- Preference-matched listings: {len(matched)}",
+        f"- Preference profile: {preference_summary}",
+        f"- Active listings outside preference profile: {len(outside_preferences)}",
         f"- Active listings tracked but excluded from recommendations: {excluded}",
         f"- Active listings with scanned history reports: {scanned_history_reports}",
         f"- Active listings with failed/unavailable history report scans: {failed_history_reports}",
@@ -141,40 +167,40 @@ def generate_recommendations_report(
 
     sections = [
         (
-            "Best Value (Price per km)",
-            "Lower price-per-km is better. Only listings with known price and mileage are ranked.",
-            _rank_best_value(recommendable, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "CAD/km", "Accident", "Maintenance", "Link"],
+            "Best Relative Price (Preference Match)",
+            "Listings matching the configured trim profile, ranked by price below the cohort median.",
+            _rank_relative_price(matched, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "vs Median", "Accident", "Maintenance", "Link"],
         ),
         (
-            "Lowest Price",
-            "Lowest current asking price among active listings.",
-            _rank_lowest_price(recommendable, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
-        ),
-        (
-            "Low Mileage",
-            "Lowest odometer reading among active listings.",
-            _rank_low_mileage(recommendable, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
-        ),
-        (
-            "Best Price by Year",
-            "Cheapest active listing within each model year (one pick per year).",
-            _rank_best_price_by_year(recommendable, top_n),
+            "Best Price by Year (Preference Match)",
+            "Cheapest preference-matched listing within each model year.",
+            _rank_best_price_by_year(matched, top_n),
             ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
         ),
         (
-            "New Listings",
-            "Most recently appeared listings (by first seen date).",
-            _rank_new_listings(recommendable, reference_at, top_n),
+            "Lowest Mileage (Preference Match)",
+            "Lowest odometer among preference-matched listings.",
+            _rank_low_mileage(matched, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
+        ),
+        (
+            "New Listings (Preference Match)",
+            "Most recently appeared preference-matched listings.",
+            _rank_new_listings(matched, reference_at, top_n),
             ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Accident", "Maintenance", "Link"],
         ),
         (
-            "Recent Price Drops",
-            "Largest recent price reductions among currently active listings.",
-            _rank_price_drops(events, recommendable, top_n),
+            "Recent Price Drops (Preference Match)",
+            "Largest recent price reductions among active preference-matched listings.",
+            _rank_price_drops(events, matched, top_n),
             ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Maintenance", "Link"],
+        ),
+        (
+            "Outside Preference Profile",
+            "Recommendable listings that do not match the configured trim profile.",
+            _rank_outside_preferences(outside_preferences, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
         ),
         (
             "Accident Risk Watchlist",
@@ -249,6 +275,10 @@ def _active_snapshots(
     return snapshots
 
 
+def _matches_preferences(vehicle: VehicleSnapshot, preferences) -> bool:
+    return vehicle_matches_recommendation_preferences(vehicle.trim, preferences)
+
+
 def _parse_positive_number(value: str | None) -> float | None:
     if value is None:
         return None
@@ -316,18 +346,24 @@ def _days_between(start_iso: str | None, end_iso: str) -> int | None:
     return max((end.date() - start.date()).days, 0)
 
 
-def _rank_best_value(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
-    scored: list[tuple[float, VehicleSnapshot]] = []
+def _rank_relative_price(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+    priced: list[tuple[float, VehicleSnapshot]] = []
     for vehicle in active:
         price = _parse_positive_number(vehicle.price_cad)
-        mileage = _parse_positive_number(vehicle.mileage_km)
-        if price is None or mileage is None:
+        if price is None:
             continue
-        scored.append((price / mileage, vehicle))
+        priced.append((price, vehicle))
 
-    scored.sort(key=lambda item: item[0])
+    if not priced:
+        return []
+
+    prices = [price for price, _ in priced]
+    median_price = statistics.median(prices)
+    scored = [(price - median_price, price, vehicle) for price, vehicle in priced]
+    scored.sort(key=lambda item: (item[0], item[1]))
+
     picks: list[RankedPick] = []
-    for ratio, vehicle in scored[:top_n]:
+    for delta, price, vehicle in scored[:top_n]:
         picks.append(
             RankedPick(
                 vin=vehicle.vin,
@@ -335,7 +371,7 @@ def _rank_best_value(active: list[VehicleSnapshot], top_n: int) -> list[RankedPi
                 trim=_display(vehicle.trim),
                 price_cad=_display(vehicle.price_cad),
                 mileage_km=_display(vehicle.mileage_km),
-                metric=f"{ratio:.2f}",
+                metric=f"{delta:+,.0f} CAD",
                 listing_url=vehicle.listing_url,
                 accident_history=_format_accident_history(vehicle),
                 vehicle_history_report=_format_vehicle_history_report(vehicle),
@@ -345,7 +381,7 @@ def _rank_best_value(active: list[VehicleSnapshot], top_n: int) -> list[RankedPi
     return picks
 
 
-def _rank_lowest_price(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+def _rank_outside_preferences(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
     scored: list[tuple[float, VehicleSnapshot]] = []
     for vehicle in active:
         price = _parse_positive_number(vehicle.price_cad)
@@ -660,6 +696,19 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.price_cad,
                 pick.first_seen_at or "unknown",
                 pick.days_listed or "unknown",
+                pick.accident_history,
+                pick.maintenance_history,
+                _format_link(pick.listing_url),
+            ]
+        elif "vs Median" in headers:
+            row = [
+                str(index),
+                pick.vin,
+                pick.year,
+                pick.trim,
+                pick.price_cad,
+                pick.mileage_km,
+                pick.metric,
                 pick.accident_history,
                 pick.maintenance_history,
                 _format_link(pick.listing_url),

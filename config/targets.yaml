@@ -5,6 +5,7 @@
 #   make + model       — canonical make/model (e.g. Ford / F-150)
 #   model_aliases      — alternate spellings agents may encounter (F150, F 150, …)
 #   search_query       — optional free-text query for Clutch.ca search box
+#   recommendation_preferences — optional trim filters for recommendation cohorts
 #
 # Browser agents should call `show-target <target_id>` to get the full search payload.
 
@@ -21,3 +22,8 @@ targets:
       min_year: 2021
       max_year: 2026
       search_query: "F-150"
+      recommendation_preferences:
+        trim_must_contain:
+          - "502A"
+          - "Crew Cab"
+          - "Short Bed"
