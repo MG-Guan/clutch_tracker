@@ -226,16 +226,30 @@ Supported statuses are `scanned`, `blocked`, `error`, `unavailable`, and `not_sc
 
 ### Recommendations report
 
-`generate-recommendations` reads `current_inventory.json`, `vehicles.csv`, and `listing_events.csv` to produce a single markdown report with ranked picks across six dimensions:
+`generate-recommendations` reads `current_inventory.json`, `vehicles.csv`, `listing_events.csv`, and `config/targets.yaml` recommendation preferences to produce a markdown report with ranked picks across preference-aware dimensions:
 
 | Dimension | Ranking logic |
 |-----------|---------------|
-| Best value | Lowest price-per-km (known price and mileage only) |
-| Lowest price | Lowest current asking price |
-| Low mileage | Lowest odometer reading |
-| Best price by year | Cheapest listing per model year |
-| New listings | Most recently first-seen listings |
-| Recent price drops | Largest reductions from `price_changed` events |
+| Best relative price | Preference-matched listings ranked by price below cohort median |
+| Best price by year | Cheapest preference-matched listing per model year |
+| Lowest mileage | Lowest odometer among preference-matched listings |
+| New listings | Most recently first-seen preference-matched listings |
+| Recent price drops | Largest reductions among preference-matched listings |
+| Outside preference profile | Recommendable listings that fail trim profile filters |
+
+Configure the preference cohort in `targets.yaml` under `criteria.recommendation_preferences`:
+
+```yaml
+recommendation_preferences:
+  trim_must_contain:
+    - "502A"
+    - "Crew Cab"
+    - "Short Bed"
+  trim_must_not_contain:
+    - "STX"
+```
+
+All tokens in `trim_must_contain` must appear in the listing trim string (case-insensitive). Unknown trim never satisfies a non-empty `trim_must_contain` list.
 
 Use `--top N` to control how many picks appear per section (default: 3). Partial scans (`scan_complete: false`) trigger a data-quality warning in the report.
 

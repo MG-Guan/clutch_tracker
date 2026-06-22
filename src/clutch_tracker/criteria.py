@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from clutch_tracker.models import Target, TargetCriteria
@@ -13,6 +14,69 @@ _MODEL_TOKEN_RE = re.compile(r"[\s\-_/]+")
 def normalize_model_token(value: str) -> str:
     """Normalize a model token for fuzzy comparison (F-150, F150, f 150 -> f150)."""
     return _MODEL_TOKEN_RE.sub("", value.strip().lower())
+
+
+@dataclass(frozen=True)
+class RecommendationPreferences:
+    """Target-specific filters for recommendation cohorts (from targets.yaml extra)."""
+
+    trim_must_contain: tuple[str, ...] = ()
+    trim_must_not_contain: tuple[str, ...] = ()
+
+
+def _parse_string_list(value: Any, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError(f"recommendation_preferences.{field_name} must be a list")
+    return tuple(str(item).strip() for item in value if item is not None and str(item).strip())
+
+
+def parse_recommendation_preferences(criteria: TargetCriteria) -> RecommendationPreferences:
+    """Load recommendation cohort filters from criteria.extra."""
+    raw = criteria.extra.get("recommendation_preferences")
+    if raw is None:
+        return RecommendationPreferences()
+    if not isinstance(raw, dict):
+        raise ValueError("criteria.extra.recommendation_preferences must be a mapping")
+    return RecommendationPreferences(
+        trim_must_contain=_parse_string_list(raw.get("trim_must_contain"), "trim_must_contain"),
+        trim_must_not_contain=_parse_string_list(raw.get("trim_must_not_contain"), "trim_must_not_contain"),
+    )
+
+
+def vehicle_matches_recommendation_preferences(
+    trim: str | None,
+    preferences: RecommendationPreferences,
+) -> bool:
+    """
+    Return whether a listing trim satisfies configured recommendation filters.
+
+    Unknown trim never satisfies a non-empty trim_must_contain list.
+    """
+    if not preferences.trim_must_contain and not preferences.trim_must_not_contain:
+        return True
+    if trim is None or not str(trim).strip():
+        return False
+
+    normalized = str(trim).lower()
+    for token in preferences.trim_must_contain:
+        if token.lower() not in normalized:
+            return False
+    for token in preferences.trim_must_not_contain:
+        if token.lower() in normalized:
+            return False
+    return True
+
+
+def format_recommendation_preferences(preferences: RecommendationPreferences) -> str:
+    """Return a compact human-readable recommendation preference summary."""
+    parts: list[str] = []
+    if preferences.trim_must_contain:
+        parts.append("trim contains " + ", ".join(preferences.trim_must_contain))
+    if preferences.trim_must_not_contain:
+        parts.append("trim excludes " + ", ".join(preferences.trim_must_not_contain))
+    return "; ".join(parts) if parts else "(no preference filters)"
 
 
 def model_search_terms(criteria: TargetCriteria) -> list[str]:
