@@ -55,6 +55,11 @@ class VehicleSnapshot:
     maintenance_records_count: int | None
     maintenance_locations_count: int | None
     maintenance_replaced_components_count: int | None
+    previous_use: str
+    previous_use_details: str | None
+    interprovincial_history: str
+    province_history: str | None
+    interprovincial_details: str | None
     recommendation_eligible: bool
 
 
@@ -72,6 +77,7 @@ class RankedPick:
     accident_history: str
     vehicle_history_report: str
     maintenance_history: str
+    usage_history: str = "unknown"
     first_seen_at: str | None = None
     days_listed: str | None = None
     old_price_cad: str | None = None
@@ -125,6 +131,8 @@ def generate_recommendations_report(
         1 for vehicle in active if vehicle.vehicle_history_report_status in {"blocked", "error", "unavailable"}
     )
     high_maintenance_risk = sum(1 for vehicle in active if vehicle.maintenance_risk_level == "high")
+    commercial_use = sum(1 for vehicle in active if vehicle.previous_use == "commercial")
+    interprovincial = sum(1 for vehicle in active if vehicle.interprovincial_history == "yes")
     reference_at = inventory.updated_at if inventory else timestamp
 
     lines = [
@@ -142,6 +150,8 @@ def generate_recommendations_report(
         f"- Active listings with scanned history reports: {scanned_history_reports}",
         f"- Active listings with failed/unavailable history report scans: {failed_history_reports}",
         f"- Active listings with high maintenance risk: {high_maintenance_risk}",
+        f"- Active listings with commercial previous use: {commercial_use}",
+        f"- Active listings with interprovincial registration history: {interprovincial}",
         f"- Recommendations per dimension: top {top_n}",
         "",
     ]
@@ -170,37 +180,37 @@ def generate_recommendations_report(
             "Best Relative Price (Preference Match)",
             "Listings matching the configured trim profile, ranked by price below the cohort median.",
             _rank_relative_price(matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "vs Median", "Accident", "Maintenance", "Link"],
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "vs Median", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "Best Price by Year (Preference Match)",
             "Cheapest preference-matched listing within each model year.",
             _rank_best_price_by_year(matched, top_n),
-            ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
+            ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "Lowest Mileage (Preference Match)",
             "Lowest odometer among preference-matched listings.",
             _rank_low_mileage(matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "New Listings (Preference Match)",
             "Most recently appeared preference-matched listings.",
             _rank_new_listings(matched, reference_at, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Accident", "Maintenance", "Link"],
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "Recent Price Drops (Preference Match)",
             "Largest recent price reductions among active preference-matched listings.",
             _rank_price_drops(events, matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Maintenance", "Link"],
+            ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "Outside Preference Profile",
             "Recommendable listings that do not match the configured trim profile.",
             _rank_outside_preferences(outside_preferences, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Link"],
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
         ),
         (
             "Accident Risk Watchlist",
@@ -219,6 +229,12 @@ def generate_recommendations_report(
             "Known moderate/high maintenance complexity among active listings, including vehicles excluded from recommendations.",
             _rank_maintenance_risk(active, top_n),
             ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Maintenance", "Accident", "Link"],
+        ),
+        (
+            "Commercial Use & Interprovincial Watchlist",
+            "Active listings flagged with commercial previous use or registration in more than one province.",
+            _rank_usage_disclosure(active, top_n),
+            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Usage/Registration", "Link"],
         ),
     ]
 
@@ -269,6 +285,11 @@ def _active_snapshots(
                 maintenance_records_count=vehicle.maintenance_records_count,
                 maintenance_locations_count=vehicle.maintenance_locations_count,
                 maintenance_replaced_components_count=vehicle.maintenance_replaced_components_count,
+                previous_use=vehicle.previous_use,
+                previous_use_details=vehicle.previous_use_details,
+                interprovincial_history=vehicle.interprovincial_history,
+                province_history=vehicle.province_history,
+                interprovincial_details=vehicle.interprovincial_details,
                 recommendation_eligible=vehicle.recommendation_eligible,
             )
         )
@@ -335,6 +356,24 @@ def _format_maintenance_history(vehicle: VehicleSnapshot) -> str:
     return ": " + "; ".join(parts) if not parts[0] else "; ".join(parts)
 
 
+def _format_usage_history(vehicle: VehicleSnapshot) -> str:
+    parts: list[str] = []
+    if vehicle.previous_use == "commercial":
+        parts.append("commercial use")
+    elif vehicle.previous_use == "personal":
+        parts.append("personal use")
+    if vehicle.interprovincial_history == "yes":
+        if vehicle.province_history:
+            parts.append(f"interprovincial: {vehicle.province_history}")
+        else:
+            parts.append("interprovincial")
+    elif vehicle.interprovincial_history == "no":
+        parts.append("single province")
+    if not parts:
+        return "unknown"
+    return "; ".join(parts)
+
+
 def _days_between(start_iso: str | None, end_iso: str) -> int | None:
     if not start_iso:
         return None
@@ -376,6 +415,7 @@ def _rank_relative_price(active: list[VehicleSnapshot], top_n: int) -> list[Rank
                 accident_history=_format_accident_history(vehicle),
                 vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
+                usage_history=_format_usage_history(vehicle),
             )
         )
     return picks
@@ -402,6 +442,7 @@ def _rank_outside_preferences(active: list[VehicleSnapshot], top_n: int) -> list
             accident_history=_format_accident_history(vehicle),
             vehicle_history_report=_format_vehicle_history_report(vehicle),
             maintenance_history=_format_maintenance_history(vehicle),
+            usage_history=_format_usage_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
     ]
@@ -428,6 +469,7 @@ def _rank_low_mileage(active: list[VehicleSnapshot], top_n: int) -> list[RankedP
             accident_history=_format_accident_history(vehicle),
             vehicle_history_report=_format_vehicle_history_report(vehicle),
             maintenance_history=_format_maintenance_history(vehicle),
+            usage_history=_format_usage_history(vehicle),
         )
         for _, vehicle in scored[:top_n]
     ]
@@ -461,6 +503,7 @@ def _rank_best_price_by_year(active: list[VehicleSnapshot], top_n: int) -> list[
                 accident_history=_format_accident_history(vehicle),
                 vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
+                usage_history=_format_usage_history(vehicle),
             )
         )
     return picks
@@ -493,6 +536,7 @@ def _rank_new_listings(
                 accident_history=_format_accident_history(vehicle),
                 vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
+                usage_history=_format_usage_history(vehicle),
                 first_seen_at=first_seen_at,
                 days_listed=str(days) if days is not None else "unknown",
             )
@@ -550,6 +594,7 @@ def _rank_price_drops(
                 accident_history=_format_accident_history(vehicle),
                 vehicle_history_report=_format_vehicle_history_report(vehicle),
                 maintenance_history=_format_maintenance_history(vehicle),
+                usage_history=_format_usage_history(vehicle),
                 old_price_cad=f"{int(old_price)}",
                 new_price_cad=f"{int(new_price)}",
                 drop_cad=f"-{int(drop)}",
@@ -652,6 +697,37 @@ def _rank_maintenance_risk(active: list[VehicleSnapshot], top_n: int) -> list[Ra
     ]
 
 
+def _rank_usage_disclosure(active: list[VehicleSnapshot], top_n: int) -> list[RankedPick]:
+    def flagged(vehicle: VehicleSnapshot) -> bool:
+        return vehicle.previous_use == "commercial" or vehicle.interprovincial_history == "yes"
+
+    candidates = [vehicle for vehicle in active if flagged(vehicle)]
+    candidates.sort(
+        key=lambda vehicle: (
+            0 if vehicle.previous_use == "commercial" else 1,
+            0 if vehicle.interprovincial_history == "yes" else 1,
+            vehicle.vin,
+        )
+    )
+
+    return [
+        RankedPick(
+            vin=vehicle.vin,
+            year=_display(vehicle.year),
+            trim=_display(vehicle.trim),
+            price_cad=_display(vehicle.price_cad),
+            mileage_km=_display(vehicle.mileage_km),
+            metric=_format_usage_history(vehicle),
+            listing_url=vehicle.listing_url,
+            accident_history=_format_accident_history(vehicle),
+            vehicle_history_report=_format_vehicle_history_report(vehicle),
+            maintenance_history=_format_maintenance_history(vehicle),
+            usage_history=_format_usage_history(vehicle),
+        )
+        for vehicle in candidates[:top_n]
+    ]
+
+
 def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
     if not picks:
         return ["_No qualifying listings._"]
@@ -660,6 +736,8 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
         "| " + " | ".join(headers) + " |",
         "| " + " | ".join(["---"] * len(headers)) + " |",
     ]
+
+    has_usage_column = "Usage/Registration" in headers
 
     for index, pick in enumerate(picks, start=1):
         if headers[0] == "Year":
@@ -671,7 +749,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.mileage_km,
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
         elif "Drop %" in headers:
             row = [
@@ -685,7 +762,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.drop_pct or "unknown",
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
         elif "Days Listed" in headers:
             row = [
@@ -698,7 +774,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.days_listed or "unknown",
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
         elif "vs Median" in headers:
             row = [
@@ -711,7 +786,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.metric,
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
         elif "CAD/km" in headers:
             row = [
@@ -724,7 +798,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.metric,
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
         elif "History Report" in headers and headers.index("Accident") < headers.index("History Report"):
             row = [
@@ -736,7 +809,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.mileage_km,
                 pick.accident_history,
                 pick.vehicle_history_report,
-                _format_link(pick.listing_url),
             ]
         elif "History Report" in headers and headers.index("History Report") < headers.index("Accident"):
             row = [
@@ -748,7 +820,6 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.mileage_km,
                 pick.vehicle_history_report,
                 pick.accident_history,
-                _format_link(pick.listing_url),
             ]
         elif "Maintenance" in headers and headers.index("Maintenance") < headers.index("Accident"):
             row = [
@@ -760,7 +831,15 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.mileage_km,
                 pick.maintenance_history,
                 pick.accident_history,
-                _format_link(pick.listing_url),
+            ]
+        elif has_usage_column and "Accident" not in headers:
+            row = [
+                str(index),
+                pick.vin,
+                pick.year,
+                pick.trim,
+                pick.price_cad,
+                pick.mileage_km,
             ]
         else:
             row = [
@@ -772,8 +851,11 @@ def _render_section(picks: list[RankedPick], headers: list[str]) -> list[str]:
                 pick.mileage_km,
                 pick.accident_history,
                 pick.maintenance_history,
-                _format_link(pick.listing_url),
             ]
+
+        if has_usage_column:
+            row.append(pick.usage_history)
+        row.append(_format_link(pick.listing_url))
         lines.append("| " + " | ".join(row) + " |")
 
     return lines
