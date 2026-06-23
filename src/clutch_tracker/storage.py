@@ -315,6 +315,11 @@ def load_current_inventory(root: Path, target_id: str) -> CurrentInventory | Non
             maintenance_records_count=_optional_int(v.get("maintenance_records_count")),
             maintenance_locations_count=_optional_int(v.get("maintenance_locations_count")),
             maintenance_replaced_components_count=_optional_int(v.get("maintenance_replaced_components_count")),
+            previous_use=v.get("previous_use", "unknown"),
+            previous_use_details=v.get("previous_use_details"),
+            interprovincial_history=v.get("interprovincial_history", "unknown"),
+            province_history=v.get("province_history"),
+            interprovincial_details=v.get("interprovincial_details"),
             recommendation_eligible=v.get("recommendation_eligible", True),
         )
         for v in data.get("vehicles", [])
@@ -360,6 +365,11 @@ def save_current_inventory(root: Path, inventory: CurrentInventory) -> None:
                 "maintenance_records_count": v.maintenance_records_count,
                 "maintenance_locations_count": v.maintenance_locations_count,
                 "maintenance_replaced_components_count": v.maintenance_replaced_components_count,
+                "previous_use": v.previous_use,
+                "previous_use_details": v.previous_use_details,
+                "interprovincial_history": v.interprovincial_history,
+                "province_history": v.province_history,
+                "interprovincial_details": v.interprovincial_details,
                 "recommendation_eligible": v.recommendation_eligible,
             }
             for v in sorted(inventory.vehicles, key=lambda x: x.vin)

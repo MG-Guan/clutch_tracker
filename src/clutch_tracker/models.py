@@ -136,6 +136,11 @@ class InventoryVehicle:
     maintenance_records_count: int | None = None
     maintenance_locations_count: int | None = None
     maintenance_replaced_components_count: int | None = None
+    previous_use: str = "unknown"
+    previous_use_details: str | None = None
+    interprovincial_history: str = "unknown"
+    province_history: str | None = None
+    interprovincial_details: str | None = None
     recommendation_eligible: bool = True
 
 
