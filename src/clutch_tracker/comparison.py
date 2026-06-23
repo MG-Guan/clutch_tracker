@@ -15,6 +15,7 @@ from clutch_tracker.accident_history import (
 from clutch_tracker.config import load_settings, project_root
 from clutch_tracker.events import build_listing_events
 from clutch_tracker.maintenance_history import MaintenanceAssessment, assess_maintenance_history
+from clutch_tracker.usage_history import UsageHistoryAssessment, assess_usage_history
 from clutch_tracker.models import (
     CurrentInventory,
     InventoryVehicle,
@@ -173,6 +174,11 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         maintenance_records_count=prev.maintenance_records_count,
         maintenance_locations_count=prev.maintenance_locations_count,
         maintenance_replaced_components_count=prev.maintenance_replaced_components_count,
+        previous_use=prev.previous_use,
+        previous_use_details=prev.previous_use_details,
+        interprovincial_history=prev.interprovincial_history,
+        province_history=prev.province_history,
+        interprovincial_details=prev.interprovincial_details,
         recommendation_eligible=prev.recommendation_eligible,
     )
 
@@ -207,6 +213,27 @@ def _merge_maintenance_assessment(
         locations_count=previous.maintenance_locations_count,
         replaced_components_count=previous.maintenance_replaced_components_count,
         recommendation_eligible=previous.maintenance_risk_level != "high",
+    )
+
+
+def _merge_usage_assessment(
+    scanned: ScanVehicle,
+    previous: InventoryVehicle | None,
+) -> UsageHistoryAssessment:
+    assessment = assess_usage_history(scanned.extra)
+    has_signal = (
+        assessment.previous_use != "unknown"
+        or assessment.interprovincial != "unknown"
+        or bool(assessment.provinces)
+    )
+    if has_signal or previous is None:
+        return assessment
+    return UsageHistoryAssessment(
+        previous_use=previous.previous_use,
+        previous_use_details=previous.previous_use_details,
+        interprovincial=previous.interprovincial_history,
+        provinces=tuple(p for p in (previous.province_history or "").split(", ") if p),
+        interprovincial_details=previous.interprovincial_details,
     )
 
 
@@ -247,6 +274,7 @@ def _inventory_from_scan(
         accident_assessment = _merge_accident_assessment(scanned, prev)
         history_report_assessment = _merge_vehicle_history_report_assessment(scanned, prev)
         maintenance_assessment = _merge_maintenance_assessment(scanned, prev)
+        usage_assessment = _merge_usage_assessment(scanned, prev)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
             last_seen_at=payload.scanned_at,
@@ -271,6 +299,11 @@ def _inventory_from_scan(
             maintenance_records_count=maintenance_assessment.records_count,
             maintenance_locations_count=maintenance_assessment.locations_count,
             maintenance_replaced_components_count=maintenance_assessment.replaced_components_count,
+            previous_use=usage_assessment.previous_use,
+            previous_use_details=usage_assessment.previous_use_details,
+            interprovincial_history=usage_assessment.interprovincial,
+            province_history=", ".join(usage_assessment.provinces) or None,
+            interprovincial_details=usage_assessment.interprovincial_details,
             recommendation_eligible=(
                 accident_assessment.recommendation_eligible and maintenance_assessment.recommendation_eligible
             ),
@@ -307,6 +340,11 @@ def _inventory_from_scan(
                     maintenance_records_count=prev.maintenance_records_count,
                     maintenance_locations_count=prev.maintenance_locations_count,
                     maintenance_replaced_components_count=prev.maintenance_replaced_components_count,
+                    previous_use=prev.previous_use,
+                    previous_use_details=prev.previous_use_details,
+                    interprovincial_history=prev.interprovincial_history,
+                    province_history=prev.province_history,
+                    interprovincial_details=prev.interprovincial_details,
                     recommendation_eligible=prev.recommendation_eligible,
                 )
 
@@ -477,6 +515,63 @@ def _build_maintenance_history_events(
     return events
 
 
+def _build_usage_history_events(
+    payload: ScanPayload,
+    previous_inventory: CurrentInventory | None,
+    new_inventory: CurrentInventory,
+) -> list[ListingEvent]:
+    previous_by_vin = {}
+    if previous_inventory:
+        previous_by_vin = {vehicle.vin: vehicle for vehicle in previous_inventory.vehicles}
+    current_by_vin = {vehicle.vin: vehicle for vehicle in new_inventory.vehicles}
+
+    events: list[ListingEvent] = []
+    for scanned in payload.vehicles:
+        assessment = assess_usage_history(scanned.extra)
+        if (
+            assessment.previous_use == "unknown"
+            and assessment.interprovincial == "unknown"
+            and not assessment.provinces
+        ):
+            continue
+        current = current_by_vin.get(scanned.vin)
+        if current is None:
+            continue
+        previous = previous_by_vin.get(scanned.vin)
+        if previous and (
+            previous.previous_use,
+            previous.previous_use_details,
+            previous.interprovincial_history,
+            previous.province_history,
+            previous.interprovincial_details,
+        ) == (
+            current.previous_use,
+            current.previous_use_details,
+            current.interprovincial_history,
+            current.province_history,
+            current.interprovincial_details,
+        ):
+            continue
+        events.append(
+            ListingEvent(
+                event_id=new_id("evt"),
+                vin=scanned.vin,
+                target_id=payload.target_id,
+                event_type="usage_history_assessed",
+                event_at=payload.scanned_at,
+                scan_id=payload.scan_id,
+                details={
+                    "previous_use": current.previous_use,
+                    "previous_use_details": current.previous_use_details,
+                    "interprovincial_history": current.interprovincial_history,
+                    "province_history": current.province_history,
+                    "interprovincial_details": current.interprovincial_details,
+                },
+            )
+        )
+    return events
+
+
 def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     """
     Import a scan JSON payload and update deterministic history.
@@ -516,6 +611,7 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     events.extend(_build_accident_history_events(payload, previous_inventory, new_inventory))
     events.extend(_build_vehicle_history_report_events(payload, previous_inventory, new_inventory))
     events.extend(_build_maintenance_history_events(payload, previous_inventory, new_inventory))
+    events.extend(_build_usage_history_events(payload, previous_inventory, new_inventory))
     append_events(root_path, events)
     save_current_inventory(root_path, new_inventory)
 
@@ -546,6 +642,13 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     failed_history_report_count = sum(
         1 for assessment in history_report_assessments if assessment.status in {"blocked", "error", "unavailable"}
     )
+    usage_assessments = [assess_usage_history(vehicle.extra) for vehicle in payload.vehicles]
+    commercial_use_count = sum(
+        1 for assessment in usage_assessments if assessment.previous_use == "commercial"
+    )
+    interprovincial_count = sum(
+        1 for assessment in usage_assessments if assessment.interprovincial == "yes"
+    )
 
     summary = {
         "target_id": payload.target_id,
@@ -560,6 +663,8 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         "vehicles_with_reported_maintenance_history": reported_maintenance_count,
         "vehicles_with_moderate_maintenance_risk": moderate_maintenance_count,
         "vehicles_with_high_maintenance_risk": high_maintenance_count,
+        "vehicles_with_commercial_use": commercial_use_count,
+        "vehicles_with_interprovincial_history": interprovincial_count,
         "observations_added": len(observations),
         "events_added": len(events),
         "active_inventory": active_count,
