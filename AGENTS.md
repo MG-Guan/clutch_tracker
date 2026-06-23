@@ -87,6 +87,40 @@ criteria:
 }
 ```
 
+## Usage & Registration Disclosure
+
+When a vehicle-history report is scanned, capture two extra disclosure signals so
+they can be surfaced in recommendations (these are **disclosure only** and never
+change recommendation eligibility):
+
+- **Commercial previous use** — Carfax "Previous Use" values such as
+  `Commercial`, `Fleet`, `Rental`, `Taxi`, `Government`, `Police`, etc.
+- **Interprovincial history** — registration/renewal records across more than one
+  Canadian province (e.g. British Columbia then Ontario).
+
+Provide them inside the existing `vehicle_history_report` object (any of these
+shapes is recognized):
+
+```json
+"vehicle_history_report": {
+  "provider": "carfax",
+  "status": "scanned",
+  "previous_use": "Commercial",
+  "registration_history": [
+    { "date": "2022-06-24", "province": "British Columbia", "type": "Canadian Renewal" },
+    { "date": "2024-01-11", "province": "Ontario", "type": "Canadian Renewal" }
+  ]
+}
+```
+
+Two-letter province codes (`BC`, `ON`, …) and province names in free-text
+summaries are also detected. Unknown values stay `unknown` — never guess.
+
+Resulting inventory fields: `previous_use`, `previous_use_details`,
+`interprovincial_history`, `province_history`, `interprovincial_details`. The
+recommendations report adds a `Usage/Registration` column plus a
+**Commercial Use & Interprovincial Watchlist** section.
+
 ## Data Layout
 
 ```
