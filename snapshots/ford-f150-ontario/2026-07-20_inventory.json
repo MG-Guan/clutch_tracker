@@ -1,0 +1,359 @@
+{
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260720_170225",
+  "snapshot_at": "2026-07-20T17:05:11-04:00",
+  "target_id": "ford-f150-ontario",
+  "updated_at": "2026-07-20T17:02:25-04:00",
+  "vehicles": [
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "90500",
+      "price_cad": "36490",
+      "status": "active",
+      "vin": "1FTEW1EB7MKE78706"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "39844",
+      "price_cad": "50290",
+      "status": "active",
+      "vin": "1FTEW1EP0PKE73329"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "95100",
+      "price_cad": "40490",
+      "status": "active",
+      "vin": "1FTEW1EP1NKD53701"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "105700",
+      "price_cad": "40590",
+      "status": "active",
+      "vin": "1FTEW1EP1NKD78307"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "122054",
+      "price_cad": "38690",
+      "status": "active",
+      "vin": "1FTEW1EP2MFA74619"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "108488",
+      "price_cad": "40290",
+      "status": "active",
+      "vin": "1FTEW1EP2MFB72646"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "57526",
+      "price_cad": "56890",
+      "status": "active",
+      "vin": "1FTEW1EP4PKE25977"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "76800",
+      "price_cad": "49890",
+      "status": "active",
+      "vin": "1FTEW1EP5NFB34801"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "64791",
+      "price_cad": "45590",
+      "status": "active",
+      "vin": "1FTEW1EP6NFA33444"
+    },
+    {
+      "last_seen_at": "2026-06-21T17:02:47-04:00",
+      "mileage_km": "55934",
+      "price_cad": "44590",
+      "status": "active",
+      "vin": "1FTEW1EP6NFB38291"
+    },
+    {
+      "last_seen_at": "2026-06-21T17:02:47-04:00",
+      "mileage_km": "63501",
+      "price_cad": "46190",
+      "status": "active",
+      "vin": "1FTEW1EP6PFC39673"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "60000",
+      "price_cad": "44390",
+      "status": "active",
+      "vin": "1FTEW1EP7NFB17238"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "45707",
+      "price_cad": "45890",
+      "status": "active",
+      "vin": "1FTEW1EP7NFB17319"
+    },
+    {
+      "last_seen_at": "2026-06-17T22:59:06-04:00",
+      "mileage_km": "15023",
+      "price_cad": "43390",
+      "status": "active",
+      "vin": "1FTEW1EP7NKF17825"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "65931",
+      "price_cad": "49790",
+      "status": "active",
+      "vin": "1FTEW1EP7PKD72756"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "45766",
+      "price_cad": "56590",
+      "status": "active",
+      "vin": "1FTEW1EP8PKF63957"
+    },
+    {
+      "last_seen_at": "2026-06-17T22:59:06-04:00",
+      "mileage_km": "67520",
+      "price_cad": "44690",
+      "status": "active",
+      "vin": "1FTEW1EPXNFB39637"
+    },
+    {
+      "last_seen_at": "2026-06-22T17:19:12-04:00",
+      "mileage_km": "111306",
+      "price_cad": "38090",
+      "status": "active",
+      "vin": "1FTEW1EPXPFA24040"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "62391",
+      "price_cad": "46890",
+      "status": "active",
+      "vin": "1FTEW1EPXPFA89812"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "53406",
+      "price_cad": "51790",
+      "status": "active",
+      "vin": "1FTEW1EPXPFC35464"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "36488",
+      "price_cad": "53890",
+      "status": "active",
+      "vin": "1FTEW1EPXPKD47088"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "48956",
+      "price_cad": "47790",
+      "status": "active",
+      "vin": "1FTEW2LP7RKE96537"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "31326",
+      "price_cad": "53590",
+      "status": "active",
+      "vin": "1FTEW3LP1RKF39209"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "29435",
+      "price_cad": "56390",
+      "status": "active",
+      "vin": "1FTEW3LP4SKD88226"
+    },
+    {
+      "last_seen_at": "2026-06-17T22:59:06-04:00",
+      "mileage_km": "22532",
+      "price_cad": null,
+      "status": "active",
+      "vin": "1FTEW3LP9RKE62198"
+    },
+    {
+      "last_seen_at": "2026-06-17T22:59:06-04:00",
+      "mileage_km": "26677",
+      "price_cad": "51890",
+      "status": "active",
+      "vin": "1FTEW3LPXRKF42433"
+    },
+    {
+      "last_seen_at": "2026-06-19T17:02:00-04:00",
+      "mileage_km": "56810",
+      "price_cad": "53190",
+      "status": "active",
+      "vin": "1FTFW1E52PKE89874"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "110672",
+      "price_cad": "39590",
+      "status": "active",
+      "vin": "1FTFW1E80MFB22261"
+    },
+    {
+      "last_seen_at": "2026-06-16T17:08:00-04:00",
+      "mileage_km": "81323",
+      "price_cad": "41390",
+      "status": "active",
+      "vin": "1FTFW1E82MKD27541"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "97385",
+      "price_cad": "39790",
+      "status": "active",
+      "vin": "1FTFW1E83MFB22044"
+    },
+    {
+      "last_seen_at": "2026-06-18T00:00:07-04:00",
+      "mileage_km": "53993",
+      "price_cad": "52490",
+      "status": "active",
+      "vin": "1FTFW1E83NKD64034"
+    },
+    {
+      "last_seen_at": "2026-06-19T17:02:00-04:00",
+      "mileage_km": "76946",
+      "price_cad": "41328",
+      "status": "active",
+      "vin": "1FTFW1E83NKF22937"
+    },
+    {
+      "last_seen_at": "2026-06-22T17:19:12-04:00",
+      "mileage_km": "125326",
+      "price_cad": "33590",
+      "status": "active",
+      "vin": "1FTFW1E83PFA24247"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "71642",
+      "price_cad": "40090",
+      "status": "active",
+      "vin": "1FTFW1E85NFA75004"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "84247",
+      "price_cad": "43190",
+      "status": "active",
+      "vin": "1FTFW1E85NKD79392"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "40842",
+      "price_cad": "46790",
+      "status": "active",
+      "vin": "1FTFW1E86NKD91289"
+    },
+    {
+      "last_seen_at": "2026-06-21T17:02:47-04:00",
+      "mileage_km": "41017",
+      "price_cad": "46790",
+      "status": "active",
+      "vin": "1FTFW1E86NKE45619"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "41017",
+      "price_cad": "47090",
+      "status": "active",
+      "vin": "1FTFW1E86NKE45819"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "54119",
+      "price_cad": "50990",
+      "status": "active",
+      "vin": "1FTFW1E86PFC74145"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "84356",
+      "price_cad": "45490",
+      "status": "active",
+      "vin": "1FTFW1E87NKD85369"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "73852",
+      "price_cad": "46790",
+      "status": "active",
+      "vin": "1FTFW1E8XNFB55365"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "90382",
+      "price_cad": "42890",
+      "status": "active",
+      "vin": "1FTFW1E8XNKF18044"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "29000",
+      "price_cad": "53790",
+      "status": "active",
+      "vin": "1FTFW1ED3PFB05472"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "19805",
+      "price_cad": "60490",
+      "status": "active",
+      "vin": "1FTFW1ED3PFB50802"
+    },
+    {
+      "last_seen_at": "2026-06-20T17:04:30-04:00",
+      "mileage_km": "41993",
+      "price_cad": "50190",
+      "status": "active",
+      "vin": "1FTFW1ED6PFA97626"
+    },
+    {
+      "last_seen_at": "2026-06-18T17:05:52-04:00",
+      "mileage_km": "54137",
+      "price_cad": "53890",
+      "status": "active",
+      "vin": "1FTFW1ED7NFB35619"
+    },
+    {
+      "last_seen_at": "2026-06-19T17:02:00-04:00",
+      "mileage_km": "116244",
+      "price_cad": "38190",
+      "status": "active",
+      "vin": "1FTFW1ED9MFB39024"
+    },
+    {
+      "last_seen_at": "2026-06-19T17:02:00-04:00",
+      "mileage_km": "32947",
+      "price_cad": "62590",
+      "status": "active",
+      "vin": "1FTFW3L52SFA09378"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "32288",
+      "price_cad": "53890",
+      "status": "active",
+      "vin": "1FTFW3L85RFB45931"
+    },
+    {
+      "last_seen_at": "2026-07-20T17:02:25-04:00",
+      "mileage_km": "16999",
+      "price_cad": "47790",
+      "status": "active",
+      "vin": "1FTFX1E51NFA00948"
+    }
+  ]
+}
