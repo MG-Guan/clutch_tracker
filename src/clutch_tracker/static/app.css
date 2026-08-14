@@ -355,6 +355,9 @@ textarea {
 .rec-section h2 { font-size: 16px; margin: 0 0 4px; }
 .rec-section p { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 .rec-metric { color: var(--amber); }
+.empty-action { text-align: center; }
+.empty-action .btn { margin-top: 8px; }
+a.op-tile { text-decoration: none; }
 
 .status-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .status-row {

@@ -120,6 +120,7 @@ class RecommendationsResult:
     scan_complete: bool
     inventory_updated_at: str | None
     sections: tuple[RecommendationSection, ...]
+    current_picks: tuple[RankedPick, ...] = ()
 
 
 def build_recommendations(
@@ -372,6 +373,7 @@ def build_recommendations(
         scan_complete=bool(inventory.scan_complete) if inventory else False,
         inventory_updated_at=inventory.updated_at if inventory else None,
         sections=sections,
+        current_picks=tuple(_rank_relative_price(recommendable, max(top_n, 12))),
     )
 
 

@@ -167,11 +167,11 @@ Then open http://127.0.0.1:8765/
 
 | Page | What it does |
 |------|----------------|
-| 总览 | Rings, donut, year bars, price×mileage scatter; shortcuts to recs / inventory / import |
+| 总览 | Rings, donut, year bars, price×mileage scatter; shortcuts to recs / scan / inventory |
 | 推荐 | Live ranked picks from **current active inventory only** (not sold / off-market). Refresh or write the markdown report. |
+| 扫描 | Open the Clutch search page and import scan JSON (the UI does not scrape Clutch.ca) |
 | 库存 | Vehicle cards with price/mileage meters and scatter |
 | 走势 | Price sparkline and event-type mix |
-| 导入 | Drag-and-drop scan JSON (this is the Scan action; the UI does not scrape Clutch.ca) |
 | 报告 | Daily / recommendations archives |
 | 运维 | Target chips, validate, initialize, doctor |
 

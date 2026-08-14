@@ -353,17 +353,17 @@ async function renderOverview() {
       <button class="op-tile" id="btn-goto-recs" type="button">
         <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
         当前推荐
-        <span class="muted">只用当前在售，点开应可买</span>
+        <span class="muted">只看现在还能买的车</span>
+      </button>
+      <button class="op-tile" id="btn-goto-import" type="button">
+        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+        扫描
+        <span class="muted">打开 Clutch，导入最新 JSON</span>
       </button>
       <button class="op-tile" id="btn-goto-inv" type="button">
         <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8h3v-1h12v1h3v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
         查看在售
         <span class="muted">库存卡片和打开链接</span>
-      </button>
-      <button class="op-tile" id="btn-goto-import" type="button">
-        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
-        导入扫描
-        <span class="muted">拖入浏览器扫到的 JSON</span>
       </button>
     </div>
     ${charts}
@@ -410,16 +410,30 @@ async function renderRecs() {
     `/api/targets/${encodeURIComponent(targetId)}/recommendations?top_n=${encodeURIComponent(topN)}`
   );
   const recs = data.recommendations || {};
-  const sections = recs.sections || [];
+  const currentPicks = recs.current_picks || [];
+  const sections = (recs.sections || []).filter((section) => (section.picks || []).length);
   const scanLabel = recs.scan_id ? `扫描 ${recs.scan_id}` : "还没有扫描";
   const warning =
     recs.scan_id && !recs.scan_complete
-      ? `<div class="banner warn">最近一次扫描是部分扫描，推荐可能漏车，请先导入完整扫描。</div>`
+      ? `<div class="banner warn">最近一次扫描是部分扫描，推荐可能漏车。点左侧「扫描」导入一次完整结果。</div>`
       : "";
+  const currentBlock =
+    currentPicks.length > 0
+      ? `<section class="rec-section">
+            <h2>当前有效推荐</h2>
+            <p>只包含现在在售、可以推荐的车。点「打开」应能买。偏好配置（${escapeHtml(
+              recs.preference_summary || "无"
+            )}）会另外标出。</p>
+            <div class="cards">${currentPicks.map(recPickCard).join("")}</div>
+          </section>`
+      : `<div class="empty-action">
+            ${empty("现在没有有效推荐。先扫描一次当前库存。")}
+            <button class="btn primary" id="recs-goto-scan" type="button">去扫描</button>
+          </div>`;
 
   $("page-recs").innerHTML = `
     <div class="banner">
-      这里只展示<strong>当前在售</strong>车辆。下架、外省可买、已售的不会出现。网页不会去 Clutch 抓取，数据来自最近一次导入的库存。
+      这里只展示<strong>当前在售</strong>车辆。下架、外省可买、已售的不会出现。
     </div>
     ${warning}
     <div class="kpis">
@@ -439,36 +453,38 @@ async function renderRecs() {
       <span class="muted mono">${escapeHtml(scanLabel)}</span>
       <span class="muted">${escapeHtml(recs.inventory_updated_at || recs.generated_at || "")}</span>
       <span style="flex:1"></span>
+      <button class="btn" id="rec-scan" type="button">扫描</button>
       <label class="muted">每维 top
         <input id="rec-top-n" type="number" min="1" value="${escapeHtml(topN)}" />
       </label>
       <button class="btn" id="rec-refresh" type="button">刷新</button>
       <button class="btn primary" id="rec-write" type="button">写入报告</button>
     </div>
-    <div class="muted rec-pref">${escapeHtml(recs.preference_summary || "")}</div>
-    ${
-      sections
-        .map((section) => {
-          const picks = section.picks || [];
-          return `<section class="rec-section">
+    ${currentBlock}
+    ${sections
+      .map((section) => {
+        const picks = section.picks || [];
+        return `<section class="rec-section">
             <h2>${escapeHtml(section.title || "")}</h2>
             <p>${escapeHtml(section.description || "")}</p>
-            <div class="cards">${picks.map(recPickCard).join("") || empty("这一维没有符合条件的在售车")}</div>
+            <div class="cards">${picks.map(recPickCard).join("")}</div>
           </section>`;
-        })
-        .join("") || empty("没有推荐。先在「导入」里放进一次完整扫描。")
-    }
+      })
+      .join("")}
   `;
 
-  $("rec-top-n").addEventListener("change", () => {
+  const goScan = () => showPage("import");
+  $("rec-scan")?.addEventListener("click", goScan);
+  $("recs-goto-scan")?.addEventListener("click", goScan);
+  $("rec-top-n")?.addEventListener("change", () => {
     const next = Number($("rec-top-n").value || 3);
     state.recTopN = Number.isFinite(next) && next >= 1 ? next : 3;
   });
-  $("rec-refresh").addEventListener("click", async (ev) => {
+  $("rec-refresh")?.addEventListener("click", async (ev) => {
     state.recTopN = Number($("rec-top-n").value || 3) || 3;
     await withButton(ev.currentTarget, () => renderRecs());
   });
-  $("rec-write").addEventListener("click", async (ev) => {
+  $("rec-write")?.addEventListener("click", async (ev) => {
     state.recTopN = Number($("rec-top-n").value || 3) || 3;
     await withButton(ev.currentTarget, async () => {
       const result = await api("/api/actions/generate-recommendations", {
@@ -621,17 +637,42 @@ async function renderHistory() {
 }
 
 async function renderImport() {
-  const scans = await api("/api/scans");
+  const targetId = requireTargetId();
+  const [scans, detail] = await Promise.all([
+    api("/api/scans"),
+    api(`/api/targets/${encodeURIComponent(targetId)}`),
+  ]);
+  const searchUrl = detail.target?.search_url;
+  const c = detail.target?.criteria || {};
   $("page-import").innerHTML = `
+    <div class="banner">
+      <strong>扫描</strong>：网页不会自己去 Clutch 抓取。打开搜索页用浏览器扫完，把 JSON 拖到下面，再回「推荐」看当前还能买的车。
+    </div>
+    <div class="ops-grid" style="margin-bottom:12px">
+      ${
+        searchUrl
+          ? `<a class="op-tile" id="open-clutch" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+              打开 Clutch 搜索
+              <span class="muted">${escapeHtml([c.make, c.model, c.province].filter(Boolean).join(" · "))}</span>
+            </a>`
+          : ""
+      }
+      <button class="op-tile" id="scan-goto-recs" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        看当前推荐
+        <span class="muted">导入之后点这里</span>
+      </button>
+    </div>
     <div id="dropzone" class="dropzone">
       <svg class="drop-icon" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
-      <div>拖入 JSON 扫描文件</div>
+      <div>把扫描 JSON 拖到这里，或点这里选文件</div>
       <input id="scan-file" type="file" accept="application/json,.json" hidden />
     </div>
     <textarea id="scan-json" placeholder="或粘贴扫描 JSON"></textarea>
-    <div class="row"><button class="btn primary" id="import-btn" type="button">导入</button></div>
+    <div class="row"><button class="btn primary" id="import-btn" type="button">导入扫描</button></div>
     <div id="import-result"></div>
-    <h2>归档 ${scans.scans?.length || 0}</h2>
+    <h2>已归档 ${scans.scans?.length || 0}</h2>
     <div class="chips">${
       (scans.scans || [])
         .map((s) => `<span class="chip">${escapeHtml(s.name.replace(/\.json$/, ""))}</span>`)
@@ -639,6 +680,7 @@ async function renderImport() {
     }</div>
   `;
 
+  $("scan-goto-recs").addEventListener("click", () => showPage("recs"));
   const dropzone = $("dropzone");
   const fileInput = $("scan-file");
   dropzone.addEventListener("click", () => fileInput.click());
@@ -674,7 +716,11 @@ async function renderImport() {
         ${kpi("在售", s.active_inventory, COLORS.green)}
         ${kpi("下架", s.removed_inventory, COLORS.red)}
         ${kpi("事件", s.events_added, COLORS.blue)}
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="import-goto-recs" type="button">查看当前推荐</button>
       </div>`;
+      $("import-goto-recs").addEventListener("click", () => showPage("recs"));
       await loadTargets();
     });
   });

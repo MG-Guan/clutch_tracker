@@ -95,6 +95,17 @@ def model_search_terms(criteria: TargetCriteria) -> list[str]:
     return terms
 
 
+def clutch_search_url(criteria: TargetCriteria) -> str | None:
+    """Build a Clutch.ca search URL from make/model. Returns None if either is missing."""
+    if not criteria.make or not criteria.model:
+        return None
+    make_slug = criteria.make.strip().lower().replace(" ", "-")
+    model_slug = criteria.model.strip().lower().replace(" ", "-")
+    if not make_slug or not model_slug:
+        return None
+    return f"https://www.clutch.ca/cars/{make_slug}-{model_slug}"
+
+
 def vehicle_matches_criteria(
     criteria: TargetCriteria,
     *,
@@ -164,6 +175,9 @@ def build_search_criteria(target: Target) -> dict[str, Any]:
         payload["criteria"]["model_aliases"] = list(c.model_aliases)
 
     payload["criteria"]["model_search_terms"] = model_search_terms(c)
+    search_url = clutch_search_url(c)
+    if search_url:
+        payload["search_url"] = search_url
     payload["scan_requirements"] = {
         "vehicle_history_report": {
             "required": True,
