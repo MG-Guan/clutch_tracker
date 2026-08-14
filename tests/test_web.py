@@ -35,10 +35,14 @@ def test_index_serves_html(project_copy: Path):
     client = _client(project_copy)
     response = client.get("/")
     assert response.status_code == 200
-    assert b"Clutch Tracker" in response.data
-    assert b"btn-restart" in response.data
-    assert b'data-page="recs"' in response.data
-    assert b"page-recs" in response.data
+    html = response.get_data(as_text=True)
+    assert "Clutch Tracker" in html
+    assert "btn-restart" in html
+    assert 'data-page="recs"' in html
+    assert "page-recs" in html
+    assert "推荐" in html
+    assert "扫描" in html
+    assert 'data-page="import"' in html
     assert client.get("/static/app.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
 
@@ -64,6 +68,7 @@ def test_show_target_returns_search_criteria(project_copy: Path):
     target = response.get_json()["target"]
     assert target["target_id"] == "ford-f150-ontario"
     assert "model_search_terms" in target["criteria"]
+    assert target["search_url"] == "https://www.clutch.ca/cars/ford-f-150"
 
 
 def test_import_scan_and_inventory(project_copy: Path):
@@ -238,6 +243,15 @@ def test_get_recommendations_uses_active_inventory(project_copy: Path):
         if pick["vin"] == "1FTFW1E50NFA12345"
     )
     assert f150["listing_url"] == "https://www.clutch.ca/vehicles/100"
+    current_vins = {pick["vin"] for pick in recs["current_picks"]}
+    assert "1FTFW1E50NFA12345" in current_vins
+    assert current_vins <= {"1FTFW1E50NFA12345", "2C3CCAAG5JH123456"}
+
+
+def test_show_target_includes_search_url(project_copy: Path):
+    response = _client(project_copy).get("/api/targets/ford-f150-ontario")
+    assert response.status_code == 200
+    assert response.get_json()["target"]["search_url"] == "https://www.clutch.ca/cars/ford-f-150"
 
 
 def test_recommendations_omit_removed_listings(project_copy: Path):
@@ -254,6 +268,7 @@ def test_recommendations_omit_removed_listings(project_copy: Path):
     vins = _recommendation_vins(recs)
     assert "1FTFW1E50NFA12345" in vins
     assert "2C3CCAAG5JH123456" not in vins
+    assert "2C3CCAAG5JH123456" not in {pick["vin"] for pick in recs["current_picks"]}
 
 
 def test_recommendations_rejects_invalid_top_n(project_copy: Path):
