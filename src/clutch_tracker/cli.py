@@ -16,6 +16,7 @@ from clutch_tracker.recommendations import generate_recommendations_report
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.target_manager import initialize_targets
 from clutch_tracker.validation import validate_config, validate_repository
+from clutch_tracker.web import DEFAULT_HOST, DEFAULT_PORT, run_server
 
 
 def _configure_logging(root: Path) -> None:
@@ -94,6 +95,11 @@ def cmd_generate_recommendations(root: Path, target_id: str, top_n: int) -> int:
     return 0
 
 
+def cmd_serve(root: Path, host: str, port: int) -> int:
+    run_server(host=host, port=port, root=root)
+    return 0
+
+
 def cmd_validate_repository(root: Path) -> int:
     result = validate_repository(root)
     for warning in result.warnings:
@@ -138,6 +144,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of picks per dimension (default: 3)",
     )
 
+    serve_parser = sub.add_parser("serve", help="Start local web UI for all tracker operations")
+    serve_parser.add_argument("--host", default=DEFAULT_HOST, help=f"Bind host (default: {DEFAULT_HOST})")
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"Bind port (default: {DEFAULT_PORT})",
+    )
+
     return parser
 
 
@@ -158,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
         "generate-report": lambda: cmd_generate_report(root, args.target_id),
         "generate-recommendations": lambda: cmd_generate_recommendations(root, args.target_id, args.top_n),
         "validate-repository": lambda: cmd_validate_repository(root),
+        "serve": lambda: cmd_serve(root, args.host, args.port),
     }
     return commands[args.command]()
 

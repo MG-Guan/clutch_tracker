@@ -47,6 +47,7 @@ python -m clutch_tracker.cli import-scan <scan-json>
 python -m clutch_tracker.cli generate-report --target <target_id>
 python -m clutch_tracker.cli generate-recommendations --target <target_id>
 python -m clutch_tracker.cli validate-repository
+python -m clutch_tracker.cli serve
 ```
 
 ## Model search in targets.yaml

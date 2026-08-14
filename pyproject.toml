@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "PyYAML>=6.0",
+    "Flask>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +26,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["clutch_tracker*"]
 namespaces = false
+
+[tool.setuptools.package-data]
+clutch_tracker = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
