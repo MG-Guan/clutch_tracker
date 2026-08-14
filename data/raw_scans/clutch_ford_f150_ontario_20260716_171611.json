@@ -1,0 +1,107 @@
+{
+  "discovered_without_vin": [
+    {
+      "count": 44,
+      "note": "Additional Ford F-150 vehicles (2021-2026) were visible in search results but were not individually inspected for VINs. VINs are shown only on detail pages, so these vehicles are not importable under the VIN-primary-key rule."
+    }
+  ],
+  "inaccessible_or_sold": [
+    {
+      "last_known_details": "2023 Ford F-150 XLT 302A Crew Cab Short Bed",
+      "listing_id": "90298",
+      "listing_url": "https://www.clutch.ca/vehicles/90298",
+      "status": "sold"
+    },
+    {
+      "last_known_details": "2023 Ford F-150 XLT 301A Crew Cab Standard Bed",
+      "listing_id": "84860",
+      "listing_url": "https://www.clutch.ca/vehicles/84860",
+      "status": "sold"
+    }
+  ],
+  "notes": "Partial browser scan of Clutch.ca search results filtered to Ford F-150, model years 2021-2026, location Mississauga, Ontario. Search results showed 48 matching vehicles, but Clutch exposes VINs only on individual detail pages, so this scan imports only detail pages whose VINs were captured. This does not prove complete Ontario inventory and must not infer removals for unscanned vehicles. Previously imported listings 90298 and 84860 were checked and displayed as sold/no longer available, so they are recorded in notes rather than imported as active vehicles.",
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260716_171611",
+  "scanned_at": "2026-07-16T17:16:11-04:00",
+  "search_filters": {
+    "location": "Mississauga, Ontario",
+    "make": "Ford",
+    "model": "F-150",
+    "years": "2021-2026"
+  },
+  "search_location": "Mississauga, Ontario",
+  "search_url": "https://www.clutch.ca/cars/ford-f-150?yearLow=2021",
+  "source": "Browser Agent manual Clutch.ca scan: Ford F-150 search, years 2021-2026, Mississauga Ontario; selected detail pages opened to capture VINs.",
+  "target_id": "ford-f150-ontario",
+  "total_results_found": 48,
+  "vehicles": [
+    {
+      "listing_id": "108102",
+      "listing_url": "https://www.clutch.ca/vehicles/108102",
+      "make": "Ford",
+      "mileage_km": 65931,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 49590,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "No accidents shown on Clutch detail page; single owner visible. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTEW1EP7PKD72756",
+      "year": 2023
+    },
+    {
+      "listing_id": "112109",
+      "listing_url": "https://www.clutch.ca/vehicles/112109",
+      "make": "Ford",
+      "mileage_km": 46002,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 55790,
+      "trim": "LARIAT 502A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "No accidents shown on Clutch detail page. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTEW1EP8PKF63957",
+      "year": 2023
+    },
+    {
+      "listing_id": "106923",
+      "listing_url": "https://www.clutch.ca/vehicles/106923",
+      "make": "Ford",
+      "mileage_km": 48956,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 47790,
+      "trim": "STX 200A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "No accidents shown on Clutch detail page; single owner visible. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTEW2LP7RKE96537",
+      "year": 2024
+    },
+    {
+      "listing_id": "114173",
+      "listing_status": "on_hold",
+      "listing_url": "https://www.clutch.ca/vehicles/114173",
+      "make": "Ford",
+      "mileage_km": 95169,
+      "model": "F-150",
+      "price_cad": 40490,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Clutch detail page showed this listing on hold for another buyer. Full Carfax report was not opened during this partial browser scan."
+      },
+      "vin": "1FTEW1EP1NKD53701",
+      "year": 2022
+    }
+  ]
+}

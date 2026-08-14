@@ -1,0 +1,109 @@
+{
+  "discovered_listing_ids": [
+    "112534",
+    "107326",
+    "96889",
+    "104121",
+    "106773"
+  ],
+  "notes": "Partial scan - Clutch.ca uses city-based location search (Mississauga, Ontario only), not province-wide. Cannot guarantee complete Ontario coverage. Found 52 Ford F-150 listings (2021-2026) in Mississauga. Carfax vehicle history reports were blocked/inaccessible because report links returned error pages. Detailed data was collected from 5 verified vehicle detail pages; all captured vehicles showed last registered in Ontario and not previously stolen on Clutch inspection pages.",
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260723_170210",
+  "scanned_at": "2026-07-23T17:02:10-04:00",
+  "source": "Browser Agent manual Clutch.ca scan: search filters Ford F-150, years 2021-2026, Mississauga Ontario; detail pages verified for captured vehicles.",
+  "target_id": "ford-f150-ontario",
+  "vehicles": [
+    {
+      "availability_status": "available",
+      "last_registered_province": "Ontario",
+      "listing_id": "112534",
+      "listing_url": "https://www.clutch.ca/vehicles/112534",
+      "make": "Ford",
+      "mileage_km": 84006,
+      "model": "F-150",
+      "price_cad": 38490,
+      "trim": "XLT 300A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Last registered in Ontario. Not previously stolen. Carfax report link available but returns error when accessed."
+      },
+      "vin": "1FTEW1EP6NFC20460",
+      "year": 2022
+    },
+    {
+      "availability_status": "available",
+      "last_registered_province": "Ontario",
+      "listing_id": "107326",
+      "listing_url": "https://www.clutch.ca/vehicles/107326",
+      "make": "Ford",
+      "mileage_km": 110871,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 38890,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents. Last registered in Ontario. Not previously stolen. Carfax report link available but returns error when accessed."
+      },
+      "vin": "1FTFW1E80MF822261",
+      "year": 2021
+    },
+    {
+      "availability_status": "on_hold",
+      "last_registered_province": "Ontario",
+      "listing_id": "104121",
+      "listing_url": "https://www.clutch.ca/vehicles/104121",
+      "make": "Ford",
+      "mileage_km": 71642,
+      "model": "F-150",
+      "price_cad": 39890,
+      "trim": "XLT 301A Crew Cab Standard Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Last registered in Ontario. Not previously stolen. Vehicle temporarily on hold for another buyer. Carfax report link available but returns error when accessed."
+      },
+      "vin": "1FTFW1E85NFA75004",
+      "year": 2022
+    },
+    {
+      "availability_status": "available",
+      "last_registered_province": "Ontario",
+      "listing_id": "96889",
+      "listing_url": "https://www.clutch.ca/vehicles/96889",
+      "make": "Ford",
+      "mileage_km": 22532,
+      "model": "F-150",
+      "price_cad": 48990,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Last registered in Ontario. Not previously stolen. Carfax report link available but returns error when accessed."
+      },
+      "vin": "1FTEW3LP9RKE62198",
+      "year": 2024
+    },
+    {
+      "availability_status": "available",
+      "last_registered_province": "Ontario",
+      "listing_id": "106773",
+      "listing_url": "https://www.clutch.ca/vehicles/106773",
+      "make": "Ford",
+      "mileage_km": 122388,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 37490,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents. Last registered in Ontario. Not previously stolen. Carfax report link available but returns error when accessed."
+      },
+      "vin": "1FTEW1EP2MFA74619",
+      "year": 2021
+    }
+  ]
+}

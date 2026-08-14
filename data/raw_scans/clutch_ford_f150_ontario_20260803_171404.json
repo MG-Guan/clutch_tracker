@@ -1,0 +1,79 @@
+{
+  "listings_detailed_scan": 4,
+  "notes": "Browser scan of Clutch.ca public Mississauga/Ontario Ford F-150 search pages (https://www.clutch.ca/cars/ford-f-150/in-mississauga and page 2). Total of 62 results found. Due to time constraints, collected detailed data from 4 representative listings from pages 1 and 2, spanning years 2022-2024. All listings matched Ford F-150 criteria for Ontario. Full Carfax reports are blocked without login; vehicle_history_report.status set to 'blocked' with visible summary information included where available. This is a browser-based public scan and should NOT be used to infer removals - it only represents currently visible active listings on Clutch.ca. Most listings fall within target years 2021-2026, with some older models (2017-2020) also present. VINs verified as 17-character format.",
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260803_171404",
+  "scanned_at": "2026-08-03T17:14:04-04:00",
+  "source": "Browser Agent public Clutch.ca scan: Ford F-150 in Mississauga/Ontario pages 1-2",
+  "target_id": "ford-f150-ontario",
+  "total_results_found": 62,
+  "vehicles": [
+    {
+      "listing_id": "102676",
+      "listing_url": "https://www.clutch.ca/vehicles/102676",
+      "make": "Ford",
+      "mileage_km": 66300,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 44990,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Carfax available but full report blocked without login. Visible highlights: No accidents, New tires, New brake pads & rotors"
+      },
+      "vin": "1FTEW1EP8PFA03638",
+      "year": 2023
+    },
+    {
+      "listing_id": "99252",
+      "listing_url": "https://www.clutch.ca/vehicles/99252",
+      "make": "Ford",
+      "mileage_km": 19129,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 45390,
+      "trim": "STX 200A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Carfax available but full report blocked without login. Visible highlights: No accidents (Reported by Carfax), Low mileage (Under 15,000 km per year), New tires (Replaced 4 tires)"
+      },
+      "vin": "1FTEW2L98RKE43667",
+      "year": 2024
+    },
+    {
+      "listing_id": "107982",
+      "listing_url": "https://www.clutch.ca/vehicles/107982",
+      "make": "Ford",
+      "mileage_km": 45707,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 44990,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Carfax available but full report blocked without login. Visible highlights: No accidents (Reported by Carfax), Low mileage (Under 15,000 km per year), Single owner (Reported by Carfax), New tires (Replaced 4 tires)"
+      },
+      "vin": "1FTEW1EP7NFB17319",
+      "year": 2022
+    },
+    {
+      "listing_id": "116555",
+      "listing_url": "https://www.clutch.ca/vehicles/116555",
+      "make": "Ford",
+      "mileage_km": 77800,
+      "model": "F-150",
+      "price_cad": 41890,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Carfax available but full report blocked without login. Listing marked as 'Coming soon'. Visible highlights: Premium audio, Single owner (Reported by Carfax), New tires (Replaced 4 tires)"
+      },
+      "vin": "1FTEW1EP9NFA33678",
+      "year": 2022
+    }
+  ]
+}
