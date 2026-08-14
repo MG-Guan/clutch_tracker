@@ -143,6 +143,8 @@ clutch-tracker import-scan tests/fixtures/scan_complete.json
 clutch-tracker generate-report --target ford-f150-ontario
 clutch-tracker generate-recommendations --target ford-f150-ontario
 clutch-tracker validate-repository
+clutch-tracker serve
+clutch-tracker serve --host 127.0.0.1 --port 8765
 
 # Or via Python module
 python -m clutch_tracker list-targets
@@ -150,6 +152,29 @@ python -m clutch_tracker list-targets
 # Fallback without pip install (from repo root)
 python run.py list-targets
 ```
+
+## Web UI
+
+Start a local operations console that covers every CLI action, plus inventory / history / report browsing:
+
+```bash
+clutch-tracker serve
+# or
+python run.py serve
+```
+
+Then open http://127.0.0.1:8765/
+
+| Page | What it does |
+|------|----------------|
+| 总览 | Rings, donut, year bars, price×mileage scatter |
+| 库存 | Vehicle cards with price/mileage meters and scatter |
+| 走势 | Price sparkline and event-type mix |
+| 导入 | Drag-and-drop scan JSON |
+| 报告 | Daily / recommendations |
+| 运维 | Target chips, validate, initialize, doctor |
+
+The server binds to `127.0.0.1` by default (local use only). It does not scrape Clutch.ca.
 
 ## Configuration
 
@@ -289,6 +314,8 @@ See [AGENTS.md](AGENTS.md) for AI agent operating instructions.
 ├── snapshots/
 ├── src/clutch_tracker/
 │   ├── cli.py
+│   ├── web.py
+│   ├── static/              # Local web UI assets
 │   ├── config.py
 │   ├── models.py
 │   ├── validation.py

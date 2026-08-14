@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clutch Tracker</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div class="brand-title">Clutch Tracker</div>
+        </div>
+        <div class="top-actions">
+          <select id="target-select" aria-label="目标"></select>
+          <button type="button" id="btn-restart" class="btn restart-btn" title="重启 serve 进程">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5a5 5 0 0 1-8.9 3.1L6.7 17.5A7 7 0 0 0 19 13c0-3.9-3.1-7-7-7z"/></svg>
+            重启
+          </button>
+        </div>
+      </header>
+
+      <div class="shell">
+        <nav class="nav" aria-label="导航">
+          <button type="button" data-page="overview" class="active" title="总览">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm8 0h8V11h-8v9zm0-16v5h8V4h-8z"/></svg>
+            总览
+          </button>
+          <button type="button" data-page="inventory" title="库存">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+            库存
+          </button>
+          <button type="button" data-page="history" title="历史">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H9v8H3v2zm10 8h8v-2h-6v-8h-2v10zM3 21h8v-6H3v6z"/></svg>
+            走势
+          </button>
+          <button type="button" data-page="import" title="导入">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+            导入
+          </button>
+          <button type="button" data-page="reports" title="报告">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 13H9v-2h6v2zm0-4H9V9h6v2zM13 9V3.5L18.5 9H13z"/></svg>
+            报告
+          </button>
+          <button type="button" data-page="ops" title="运维">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+            运维
+          </button>
+        </nav>
+
+        <main class="main">
+          <section id="page-overview" class="page active"></section>
+          <section id="page-inventory" class="page"></section>
+          <section id="page-history" class="page"></section>
+          <section id="page-import" class="page"></section>
+          <section id="page-reports" class="page"></section>
+          <section id="page-ops" class="page"></section>
+        </main>
+      </div>
+    </div>
+    <div id="restart-mask" class="restart-mask" hidden>正在重启服务…</div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
