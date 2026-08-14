@@ -1,0 +1,275 @@
+{
+  "discovered_listing_ids": [
+    "101301",
+    "104836",
+    "111287",
+    "102676",
+    "105262",
+    "101047",
+    "116178",
+    "96889",
+    "105561",
+    "119691",
+    "117943",
+    "114323",
+    "101408"
+  ],
+  "notes": "Partial Clutch.ca browser scan for target ford-f150-ontario. Browser search at Mississauga, Ontario showed 57 Ford F-150 results for model years 2021-2026, but this scan only verified a sample of visible detail pages and does not prove complete Ontario-wide inventory. Listing 101301 appeared in the browser scan but the public detail text could not be verified, so it is listed only as discovered and is not imported as a vehicle. Full Carfax reports were not opened because they require interactive/reCAPTCHA access; visible Clutch History/Inspection summaries are captured. Because scan_complete is false, missing vehicles must not be treated as removed.",
+  "scan_complete": false,
+  "scan_id": "clutch_ford_f150_ontario_20260804_172625",
+  "scanned_at": "2026-08-04T17:26:25-04:00",
+  "source": "Browser Agent Clutch.ca scan plus public detail-page text verification for Ford F-150, years 2021-2026, Mississauga Ontario.",
+  "target_id": "ford-f150-ontario",
+  "vehicles": [
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "104836",
+      "listing_url": "https://www.clutch.ca/vehicles/104836",
+      "make": "Ford",
+      "mileage_km": 39844,
+      "model": "F-150",
+      "price_cad": 46790,
+      "service_history": {
+        "replaced_parts": [
+          "tires"
+        ]
+      },
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 open recalls found; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW1EP0PKE73329",
+      "year": 2023
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "111287",
+      "listing_url": "https://www.clutch.ca/vehicles/111287",
+      "make": "Ford",
+      "mileage_km": 90382,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 42090,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTFW1E8XNKF18044",
+      "year": 2022
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "102676",
+      "listing_url": "https://www.clutch.ca/vehicles/102676",
+      "make": "Ford",
+      "mileage_km": 66300,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 45690,
+      "service_history": {
+        "replaced_parts": [
+          "tires",
+          "front brake pads",
+          "front rotors",
+          "rear brake pads",
+          "rear rotors"
+        ]
+      },
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; last registered in Ontario; not previously stolen. Visible highlights: new tires and front/rear brake pads and rotors replaced. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW1EP8PFA03638",
+      "year": 2023
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "105262",
+      "listing_url": "https://www.clutch.ca/vehicles/105262",
+      "make": "Ford",
+      "mileage_km": 31326,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 53190,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW3LP1RKF39209",
+      "year": 2024
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "101047",
+      "listing_url": "https://www.clutch.ca/vehicles/101047",
+      "make": "Ford",
+      "mileage_km": 26677,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 47490,
+      "trim": "XLT 301A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; 0 open recalls found; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW3LPXRKF42433",
+      "year": 2024
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "116178",
+      "listing_url": "https://www.clutch.ca/vehicles/116178",
+      "make": "Ford",
+      "mileage_km": 63277,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 47590,
+      "trim": "XLT Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; 0 open recalls found; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW3LP2RFC06185",
+      "year": 2024
+    },
+    {
+      "availability_status": "reserved_notify_me",
+      "last_registered_province": "ON",
+      "listing_id": "96889",
+      "listing_url": "https://www.clutch.ca/vehicles/96889",
+      "make": "Ford",
+      "mileage_km": 22532,
+      "model": "F-150",
+      "price_cad": 46990,
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Reserved / Notify me shown. Last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW3LP9RKE62198",
+      "year": 2024
+    },
+    {
+      "availability_status": "available_other_regions_notify_me",
+      "last_registered_province": "ON",
+      "listing_id": "105561",
+      "listing_url": "https://www.clutch.ca/vehicles/105561",
+      "make": "Ford",
+      "mileage_km": 32288,
+      "model": "F-150",
+      "price_cad": 52590,
+      "service_history": {
+        "replaced_parts": [
+          "tires"
+        ]
+      },
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Available in other regions / Notify me shown. 0 open recalls found; last registered in Ontario; not previously stolen. Visible highlight: new tires. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTFW3L85RFB45931",
+      "year": 2024
+    },
+    {
+      "availability_status": "coming_soon_notify_me",
+      "listing_id": "119691",
+      "listing_url": "https://www.clutch.ca/vehicles/119691",
+      "make": "Ford",
+      "mileage_km": 79500,
+      "model": "F-150",
+      "price_cad": 44690,
+      "trim": "XLT 300A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "Coming soon / Notify me shown. Full Carfax report link was visible but not opened during this partial scan; no province or accident summary was visible in the fetched detail text."
+      },
+      "vin": "1FTEW1EP3PKF06758",
+      "year": 2023
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "117943",
+      "listing_url": "https://www.clutch.ca/vehicles/117943",
+      "make": "Ford",
+      "mileage_km": 39220,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 54990,
+      "trim": "LARIAT Crew Cab",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; 0 open recalls found; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTFW1E80PKE62604",
+      "year": 2023
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "114323",
+      "listing_url": "https://www.clutch.ca/vehicles/114323",
+      "make": "Ford",
+      "mileage_km": 36045,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 53990,
+      "trim": "LARIAT 502A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; 0 open recalls found; last registered in Ontario; not previously stolen. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTEW1EP5PKF33024",
+      "year": 2023
+    },
+    {
+      "availability_status": "start_purchase",
+      "last_registered_province": "ON",
+      "listing_id": "101408",
+      "listing_url": "https://www.clutch.ca/vehicles/101408",
+      "make": "Ford",
+      "mileage_km": 44789,
+      "model": "F-150",
+      "no_accidents": true,
+      "price_cad": 49690,
+      "service_history": {
+        "replaced_parts": [
+          "front brake pads",
+          "front rotors",
+          "rear brake pads",
+          "rear rotors"
+        ]
+      },
+      "trim": "XLT 302A Crew Cab Short Bed",
+      "vehicle_history_report": {
+        "provider": "carfax",
+        "status": "blocked",
+        "summary": "0 accidents; 0 open recalls found; last registered in Ontario; not previously stolen. Visible highlight: front and rear brake pads and rotors replaced. Full Carfax report link was visible but not opened during this partial scan."
+      },
+      "vin": "1FTFW1E51PKE06046",
+      "year": 2023
+    }
+  ]
+}
