@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import statistics
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -86,15 +86,53 @@ class RankedPick:
     drop_pct: str | None = None
 
 
-def generate_recommendations_report(
+@dataclass(frozen=True)
+class RecommendationSection:
+    """One ranked recommendation dimension."""
+
+    key: str
+    title: str
+    description: str
+    headers: tuple[str, ...]
+    picks: tuple[RankedPick, ...]
+    primary: bool = True
+
+
+@dataclass(frozen=True)
+class RecommendationsResult:
+    """Structured recommendations built from current active inventory."""
+
+    target_id: str
+    generated_at: str
+    preference_summary: str
+    active_listings: int
+    recommendable_listings: int
+    preference_matched: int
+    outside_preference_count: int
+    excluded: int
+    scanned_history_reports: int
+    failed_history_reports: int
+    high_maintenance_risk: int
+    commercial_use: int
+    interprovincial: int
+    top_n: int
+    scan_id: str | None
+    scan_complete: bool
+    inventory_updated_at: str | None
+    sections: tuple[RecommendationSection, ...]
+
+
+def build_recommendations(
     root: Path | None,
     target_id: str,
     *,
     top_n: int = 3,
-) -> Path:
-    """Generate a multi-dimensional markdown recommendations report."""
+) -> RecommendationsResult:
+    """Rank current active listings. Removed / unavailable vehicles are omitted."""
     root_path = project_root(root)
     timestamp = now_iso(root_path)
+    if top_n < 1:
+        raise ValueError("top_n must be >= 1")
 
     inventory = load_current_inventory(root_path, target_id)
     vehicles = load_vehicles(root_path, target_id)
@@ -107,12 +145,6 @@ def generate_recommendations_report(
         else parse_recommendation_preferences(TargetCriteria())
     )
     preference_summary = format_recommendation_preferences(preferences)
-
-    report_dir = recommendations_report_dir(root_path, target_id)
-    report_dir.mkdir(parents=True, exist_ok=True)
-
-    date_part = timestamp[:10]
-    report_path = report_dir / f"{date_part}.md"
 
     active = _active_snapshots(inventory, vehicles)
     recommendable = [vehicle for vehicle in active if vehicle.recommendation_eligible]
@@ -135,37 +167,265 @@ def generate_recommendations_report(
     interprovincial = sum(1 for vehicle in active if vehicle.interprovincial_history == "yes")
     reference_at = inventory.updated_at if inventory else timestamp
 
+    sections = (
+        RecommendationSection(
+            key="relative_price",
+            title="Best Relative Price (Preference Match)",
+            description="Listings matching the configured trim profile, ranked by price below the cohort median.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "vs Median",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_relative_price(matched, top_n)),
+        ),
+        RecommendationSection(
+            key="price_by_year",
+            title="Best Price by Year (Preference Match)",
+            description="Cheapest preference-matched listing within each model year.",
+            headers=(
+                "Year",
+                "VIN",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_best_price_by_year(matched, top_n)),
+        ),
+        RecommendationSection(
+            key="low_mileage",
+            title="Lowest Mileage (Preference Match)",
+            description="Lowest odometer among preference-matched listings.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_low_mileage(matched, top_n)),
+        ),
+        RecommendationSection(
+            key="new_listings",
+            title="New Listings (Preference Match)",
+            description="Most recently appeared preference-matched listings.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "First Seen",
+                "Days Listed",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_new_listings(matched, reference_at, top_n)),
+        ),
+        RecommendationSection(
+            key="price_drops",
+            title="Recent Price Drops (Preference Match)",
+            description="Largest recent price reductions among active preference-matched listings.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Old Price",
+                "New Price",
+                "Drop",
+                "Drop %",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_price_drops(events, matched, top_n)),
+        ),
+        RecommendationSection(
+            key="outside_preferences",
+            title="Outside Preference Profile",
+            description="Recommendable listings that do not match the configured trim profile.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Accident",
+                "Maintenance",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_outside_preferences(outside_preferences, top_n)),
+            primary=False,
+        ),
+        RecommendationSection(
+            key="accident_watchlist",
+            title="Accident Risk Watchlist",
+            description="Reported accident/damage history among active listings, including vehicles excluded from recommendations.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Accident",
+                "History Report",
+                "Link",
+            ),
+            picks=tuple(_rank_accident_risk(active, top_n)),
+            primary=False,
+        ),
+        RecommendationSection(
+            key="history_scan_watchlist",
+            title="Vehicle History Scan Watchlist",
+            description="Active listings whose full vehicle-history report was not successfully scanned.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "History Report",
+                "Accident",
+                "Link",
+            ),
+            picks=tuple(_rank_history_report_scan_gaps(active, top_n)),
+            primary=False,
+        ),
+        RecommendationSection(
+            key="maintenance_watchlist",
+            title="Maintenance Risk Watchlist",
+            description="Known moderate/high maintenance complexity among active listings, including vehicles excluded from recommendations.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Maintenance",
+                "Accident",
+                "Link",
+            ),
+            picks=tuple(_rank_maintenance_risk(active, top_n)),
+            primary=False,
+        ),
+        RecommendationSection(
+            key="usage_watchlist",
+            title="Commercial Use & Interprovincial Watchlist",
+            description="Active listings flagged with commercial previous use or registration in more than one province.",
+            headers=(
+                "Rank",
+                "VIN",
+                "Year",
+                "Trim",
+                "Price (CAD)",
+                "Mileage (km)",
+                "Usage/Registration",
+                "Link",
+            ),
+            picks=tuple(_rank_usage_disclosure(active, top_n)),
+            primary=False,
+        ),
+    )
+
+    return RecommendationsResult(
+        target_id=target_id,
+        generated_at=timestamp,
+        preference_summary=preference_summary,
+        active_listings=len(active),
+        recommendable_listings=len(recommendable),
+        preference_matched=len(matched),
+        outside_preference_count=len(outside_preferences),
+        excluded=excluded,
+        scanned_history_reports=scanned_history_reports,
+        failed_history_reports=failed_history_reports,
+        high_maintenance_risk=high_maintenance_risk,
+        commercial_use=commercial_use,
+        interprovincial=interprovincial,
+        top_n=top_n,
+        scan_id=inventory.scan_id if inventory else None,
+        scan_complete=bool(inventory.scan_complete) if inventory else False,
+        inventory_updated_at=inventory.updated_at if inventory else None,
+        sections=sections,
+    )
+
+
+def recommendations_payload(result: RecommendationsResult) -> dict:
+    """JSON-ready recommendations for the local web UI."""
+    return asdict(result)
+
+
+def generate_recommendations_report(
+    root: Path | None,
+    target_id: str,
+    *,
+    top_n: int = 3,
+    result: RecommendationsResult | None = None,
+) -> Path:
+    """Generate a multi-dimensional markdown recommendations report."""
+    root_path = project_root(root)
+    payload = result or build_recommendations(root_path, target_id, top_n=top_n)
+
+    report_dir = recommendations_report_dir(root_path, target_id)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"{payload.generated_at[:10]}.md"
+
     lines = [
-        f"# Recommendations: {target_id}",
+        f"# Recommendations: {payload.target_id}",
         "",
-        f"Generated at: {timestamp}",
+        f"Generated at: {payload.generated_at}",
         "",
         "## Summary",
         "",
-        f"- Active listings analyzed: {len(recommendable)}",
-        f"- Preference-matched listings: {len(matched)}",
-        f"- Preference profile: {preference_summary}",
-        f"- Active listings outside preference profile: {len(outside_preferences)}",
-        f"- Active listings tracked but excluded from recommendations: {excluded}",
-        f"- Active listings with scanned history reports: {scanned_history_reports}",
-        f"- Active listings with failed/unavailable history report scans: {failed_history_reports}",
-        f"- Active listings with high maintenance risk: {high_maintenance_risk}",
-        f"- Active listings with commercial previous use: {commercial_use}",
-        f"- Active listings with interprovincial registration history: {interprovincial}",
-        f"- Recommendations per dimension: top {top_n}",
+        f"- Active listings analyzed: {payload.recommendable_listings}",
+        f"- Preference-matched listings: {payload.preference_matched}",
+        f"- Preference profile: {payload.preference_summary}",
+        f"- Active listings outside preference profile: {payload.outside_preference_count}",
+        f"- Active listings tracked but excluded from recommendations: {payload.excluded}",
+        f"- Active listings with scanned history reports: {payload.scanned_history_reports}",
+        f"- Active listings with failed/unavailable history report scans: {payload.failed_history_reports}",
+        f"- Active listings with high maintenance risk: {payload.high_maintenance_risk}",
+        f"- Active listings with commercial previous use: {payload.commercial_use}",
+        f"- Active listings with interprovincial registration history: {payload.interprovincial}",
+        f"- Recommendations per dimension: top {payload.top_n}",
         "",
     ]
 
-    if inventory:
+    if payload.inventory_updated_at or payload.scan_id:
         lines.extend(
             [
-                f"- Last scan ID: {inventory.scan_id or 'unknown'}",
-                f"- Last scan complete: {inventory.scan_complete}",
-                f"- Inventory updated at: {inventory.updated_at}",
+                f"- Last scan ID: {payload.scan_id or 'unknown'}",
+                f"- Last scan complete: {payload.scan_complete}",
+                f"- Inventory updated at: {payload.inventory_updated_at}",
                 "",
             ]
         )
-        if not inventory.scan_complete:
+        if not payload.scan_complete:
             lines.extend(
                 [
                     "> **Data quality warning:** The latest scan was partial "
@@ -175,72 +435,9 @@ def generate_recommendations_report(
                 ]
             )
 
-    sections = [
-        (
-            "Best Relative Price (Preference Match)",
-            "Listings matching the configured trim profile, ranked by price below the cohort median.",
-            _rank_relative_price(matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "vs Median", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "Best Price by Year (Preference Match)",
-            "Cheapest preference-matched listing within each model year.",
-            _rank_best_price_by_year(matched, top_n),
-            ["Year", "VIN", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "Lowest Mileage (Preference Match)",
-            "Lowest odometer among preference-matched listings.",
-            _rank_low_mileage(matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "New Listings (Preference Match)",
-            "Most recently appeared preference-matched listings.",
-            _rank_new_listings(matched, reference_at, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "First Seen", "Days Listed", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "Recent Price Drops (Preference Match)",
-            "Largest recent price reductions among active preference-matched listings.",
-            _rank_price_drops(events, matched, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Old Price", "New Price", "Drop", "Drop %", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "Outside Preference Profile",
-            "Recommendable listings that do not match the configured trim profile.",
-            _rank_outside_preferences(outside_preferences, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "Maintenance", "Usage/Registration", "Link"],
-        ),
-        (
-            "Accident Risk Watchlist",
-            "Reported accident/damage history among active listings, including vehicles excluded from recommendations.",
-            _rank_accident_risk(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Accident", "History Report", "Link"],
-        ),
-        (
-            "Vehicle History Scan Watchlist",
-            "Active listings whose full vehicle-history report was not successfully scanned.",
-            _rank_history_report_scan_gaps(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "History Report", "Accident", "Link"],
-        ),
-        (
-            "Maintenance Risk Watchlist",
-            "Known moderate/high maintenance complexity among active listings, including vehicles excluded from recommendations.",
-            _rank_maintenance_risk(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Maintenance", "Accident", "Link"],
-        ),
-        (
-            "Commercial Use & Interprovincial Watchlist",
-            "Active listings flagged with commercial previous use or registration in more than one province.",
-            _rank_usage_disclosure(active, top_n),
-            ["Rank", "VIN", "Year", "Trim", "Price (CAD)", "Mileage (km)", "Usage/Registration", "Link"],
-        ),
-    ]
-
-    for title, description, picks, headers in sections:
-        lines.extend([f"## {title}", "", description, ""])
-        lines.extend(_render_section(picks, headers))
+    for section in payload.sections:
+        lines.extend([f"## {section.title}", "", section.description, ""])
+        lines.extend(_render_section(list(section.picks), list(section.headers)))
         lines.append("")
 
     content = "\n".join(lines).rstrip() + "\n"

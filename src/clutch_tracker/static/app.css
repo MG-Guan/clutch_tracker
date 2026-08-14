@@ -330,6 +330,32 @@ textarea {
 .op-tile svg { width: 28px; height: 28px; fill: var(--amber); margin-bottom: 6px; }
 .op-tile .muted { display: block; font-size: 12px; margin-top: 4px; }
 
+.banner {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.banner.warn {
+  border-color: rgba(227, 154, 60, 0.45);
+  color: var(--text);
+}
+.banner strong { color: var(--text); font-weight: 650; }
+.rec-toolbar { margin-bottom: 8px; }
+.rec-toolbar input[type="number"] {
+  width: 56px;
+  margin-left: 6px;
+}
+.rec-pref { margin: 0 0 16px; font-size: 12px; }
+.rec-section { margin-bottom: 20px; }
+.rec-section h2 { font-size: 16px; margin: 0 0 4px; }
+.rec-section p { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.rec-metric { color: var(--amber); }
+
 .status-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .status-row {
   display: flex;

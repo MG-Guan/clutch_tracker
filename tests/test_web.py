@@ -37,6 +37,8 @@ def test_index_serves_html(project_copy: Path):
     assert response.status_code == 200
     assert b"Clutch Tracker" in response.data
     assert b"btn-restart" in response.data
+    assert b'data-page="recs"' in response.data
+    assert b"page-recs" in response.data
     assert client.get("/static/app.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
 
@@ -120,7 +122,22 @@ def test_generate_report_and_recommendations(project_copy: Path):
         json={"target_id": "ford-f150-ontario", "top_n": 2},
     )
     assert recs.status_code == 200
-    assert "Recommendations" in recs.get_json()["content"]
+    recs_body = recs.get_json()
+    assert "Recommendations" in recs_body["content"]
+    assert recs_body["recommendations"]["active_listings"] == 2
+    posted_vins = {
+        pick["vin"]
+        for section in recs_body["recommendations"]["sections"]
+        for pick in section["picks"]
+    }
+    assert posted_vins <= {"1FTFW1E50NFA12345", "2C3CCAAG5JH123456"}
+    f150 = next(
+        pick
+        for section in recs_body["recommendations"]["sections"]
+        for pick in section["picks"]
+        if pick["vin"] == "1FTFW1E50NFA12345"
+    )
+    assert f150["listing_url"] == "https://www.clutch.ca/vehicles/100"
 
 
 def test_report_path_traversal_rejected(project_copy: Path):
@@ -196,3 +213,50 @@ def test_observations_and_events_pagination(project_copy: Path):
 
     events = client.get("/api/targets/ford-f150-ontario/events")
     assert events.get_json()["total"] >= 1
+
+
+def _recommendation_vins(payload: dict) -> set[str]:
+    return {pick["vin"] for section in payload["sections"] for pick in section["picks"]}
+
+
+def test_get_recommendations_uses_active_inventory(project_copy: Path):
+    client = _client(project_copy)
+    client.post("/api/scans", json=_scan_payload())
+
+    response = client.get("/api/targets/ford-f150-ontario/recommendations?top_n=3")
+    assert response.status_code == 200
+    recs = response.get_json()["recommendations"]
+    assert recs["target_id"] == "ford-f150-ontario"
+    assert recs["active_listings"] == 2
+    assert recs["scan_complete"] is True
+    vins = _recommendation_vins(recs)
+    assert vins <= {"1FTFW1E50NFA12345", "2C3CCAAG5JH123456"}
+    f150 = next(
+        pick
+        for section in recs["sections"]
+        for pick in section["picks"]
+        if pick["vin"] == "1FTFW1E50NFA12345"
+    )
+    assert f150["listing_url"] == "https://www.clutch.ca/vehicles/100"
+
+
+def test_recommendations_omit_removed_listings(project_copy: Path):
+    client = _client(project_copy)
+    client.post("/api/scans", json=_scan_payload())
+    remaining = _scan_payload()
+    remaining["scan_id"] = "scan_test_002"
+    remaining["scanned_at"] = "2026-06-17T10:00:00-04:00"
+    remaining["vehicles"] = [remaining["vehicles"][0]]
+    client.post("/api/scans", json=remaining)
+
+    recs = client.get("/api/targets/ford-f150-ontario/recommendations").get_json()["recommendations"]
+    assert recs["active_listings"] == 1
+    vins = _recommendation_vins(recs)
+    assert "1FTFW1E50NFA12345" in vins
+    assert "2C3CCAAG5JH123456" not in vins
+
+
+def test_recommendations_rejects_invalid_top_n(project_copy: Path):
+    response = _client(project_copy).get("/api/targets/ford-f150-ontario/recommendations?top_n=0")
+    assert response.status_code == 400
+    assert response.get_json()["ok"] is False

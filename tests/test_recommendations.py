@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from clutch_tracker.comparison import import_scan
-from clutch_tracker.recommendations import generate_recommendations_report
+from clutch_tracker.recommendations import build_recommendations, generate_recommendations_report
 from clutch_tracker.storage import recommendations_report_dir
 
 
@@ -168,3 +168,18 @@ def test_generate_recommendations_excludes_unknown_trim_from_preference_match(pr
     outside = content.split("## Outside Preference Profile", 1)[1].split("## Accident Risk Watchlist", 1)[0]
     assert "VINUNKNOWNTRIM1" in outside
     assert "VIN302A123456789" in outside
+
+
+def test_build_recommendations_skips_removed_listings(project_copy: Path):
+    import_scan(project_copy, _load_fixture("scan_complete.json"))
+    remaining = _load_fixture("scan_complete.json")
+    remaining["scan_id"] = "scan_test_removed"
+    remaining["scanned_at"] = "2026-06-17T10:00:00-04:00"
+    remaining["vehicles"] = [remaining["vehicles"][0]]
+    import_scan(project_copy, remaining)
+
+    result = build_recommendations(project_copy, "ford-f150-ontario", top_n=3)
+    vins = {pick.vin for section in result.sections for pick in section.picks}
+    assert result.active_listings == 1
+    assert "1FTFW1E50NFA12345" in vins
+    assert "2C3CCAAG5JH123456" not in vins

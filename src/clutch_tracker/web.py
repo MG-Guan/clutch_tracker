@@ -18,7 +18,11 @@ from clutch_tracker.comparison import import_scan
 from clutch_tracker.config import load_settings, load_targets, project_root
 from clutch_tracker.criteria import build_search_criteria, format_criteria_summary
 from clutch_tracker.doctor import collect_doctor_report
-from clutch_tracker.recommendations import generate_recommendations_report
+from clutch_tracker.recommendations import (
+    build_recommendations,
+    generate_recommendations_report,
+    recommendations_payload,
+)
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.storage import (
     events_path,
@@ -193,6 +197,13 @@ def create_app(root: Path | None = None) -> Flask:
             }
         )
 
+    @app.get("/api/targets/<target_id>/recommendations")
+    def api_get_recommendations(target_id: str):
+        _require_target(_root(), target_id)
+        top_n_int = _parse_top_n(request.args.get("top_n", 3))
+        result = build_recommendations(_root(), target_id, top_n=top_n_int)
+        return jsonify({"ok": True, "recommendations": recommendations_payload(result)})
+
     @app.post("/api/actions/generate-recommendations")
     def api_generate_recommendations():
         body = request.get_json(silent=True) or {}
@@ -200,20 +211,16 @@ def create_app(root: Path | None = None) -> Flask:
         if not target_id:
             return jsonify({"ok": False, "error": "target_id is required"}), 400
         _require_target(_root(), str(target_id))
-        top_n = body.get("top_n", 3)
-        try:
-            top_n_int = int(top_n)
-        except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "top_n must be an integer"}), 400
-        if top_n_int < 1:
-            return jsonify({"ok": False, "error": "top_n must be >= 1"}), 400
-        report_path = generate_recommendations_report(_root(), str(target_id), top_n=top_n_int)
+        top_n_int = _parse_top_n(body.get("top_n", 3))
+        result = build_recommendations(_root(), str(target_id), top_n=top_n_int)
+        report_path = generate_recommendations_report(_root(), str(target_id), top_n=top_n_int, result=result)
         return jsonify(
             {
                 "ok": True,
                 "path": str(report_path.relative_to(_root())),
                 "name": report_path.name,
                 "content": report_path.read_text(encoding="utf-8"),
+                "recommendations": recommendations_payload(result),
             }
         )
 
@@ -299,6 +306,16 @@ def schedule_restart(app: Flask, *, delay_s: float = 0.6) -> bool:
 
 def _root() -> Path:
     return Path(current_app.config["CLUTCH_ROOT"])
+
+
+def _parse_top_n(value: Any) -> int:
+    try:
+        top_n_int = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("top_n must be an integer") from None
+    if top_n_int < 1:
+        raise ValueError("top_n must be >= 1")
+    return top_n_int
 
 
 def _require_target(root: Path, target_id: str):

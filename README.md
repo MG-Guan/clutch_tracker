@@ -167,11 +167,12 @@ Then open http://127.0.0.1:8765/
 
 | Page | What it does |
 |------|----------------|
-| 总览 | Rings, donut, year bars, price×mileage scatter |
+| 总览 | Rings, donut, year bars, price×mileage scatter; shortcuts to recs / inventory / import |
+| 推荐 | Live ranked picks from **current active inventory only** (not sold / off-market). Refresh or write the markdown report. |
 | 库存 | Vehicle cards with price/mileage meters and scatter |
 | 走势 | Price sparkline and event-type mix |
-| 导入 | Drag-and-drop scan JSON |
-| 报告 | Daily / recommendations |
+| 导入 | Drag-and-drop scan JSON (this is the Scan action; the UI does not scrape Clutch.ca) |
+| 报告 | Daily / recommendations archives |
 | 运维 | Target chips, validate, initialize, doctor |
 
 The server binds to `127.0.0.1` by default (local use only). It does not scrape Clutch.ca.

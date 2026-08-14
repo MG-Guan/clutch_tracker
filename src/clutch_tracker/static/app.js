@@ -13,6 +13,7 @@ const state = {
   targets: [],
   invFilter: "active",
   reportKind: "daily",
+  recTopN: 3,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -280,6 +281,7 @@ async function render() {
   const page = state.page;
   try {
     if (page === "overview") await renderOverview();
+    else if (page === "recs") await renderRecs();
     else if (page === "inventory") await renderInventory();
     else if (page === "history") await renderHistory();
     else if (page === "import") await renderImport();
@@ -347,8 +349,136 @@ async function renderOverview() {
       ${kpi("VIN", t.tracked_vins, COLORS.blue, Math.max(t.tracked_vins, 1))}
       ${kpi("目标", t.targets, COLORS.amber, Math.max(t.targets, 1))}
     </div>
+    <div class="ops-grid" style="margin-bottom:12px">
+      <button class="op-tile" id="btn-goto-recs" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        当前推荐
+        <span class="muted">只用当前在售，点开应可买</span>
+      </button>
+      <button class="op-tile" id="btn-goto-inv" type="button">
+        <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8h3v-1h12v1h3v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+        查看在售
+        <span class="muted">库存卡片和打开链接</span>
+      </button>
+      <button class="op-tile" id="btn-goto-import" type="button">
+        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+        导入扫描
+        <span class="muted">拖入浏览器扫到的 JSON</span>
+      </button>
+    </div>
     ${charts}
   `;
+  $("btn-goto-recs").addEventListener("click", () => showPage("recs"));
+  $("btn-goto-inv").addEventListener("click", () => showPage("inventory"));
+  $("btn-goto-import").addEventListener("click", () => showPage("import"));
+}
+
+function recPickCard(pick) {
+  const url = pick.listing_url;
+  const title = [pick.year, pick.trim].filter(Boolean).join(" ") || pick.vin;
+  const priceLabel = money(pick.price_cad) === "—" ? pick.price_cad || "—" : money(pick.price_cad);
+  const kmLabel = km(pick.mileage_km) === "—" ? pick.mileage_km || "—" : km(pick.mileage_km);
+  return `<article class="vcard">
+    <div class="vcard-top">
+      <div>
+        <div class="vcard-title">${escapeHtml(title)}</div>
+        <div class="vcard-sub rec-metric">${escapeHtml(pick.metric || "")}</div>
+      </div>
+      ${badge("在售", "on")}
+    </div>
+    <div class="chips">
+      <span class="chip"><b>价</b>${escapeHtml(priceLabel)}</span>
+      <span class="chip"><b>里程</b>${escapeHtml(kmLabel)}</span>
+      ${pick.accident_history ? `<span class="chip">${escapeHtml(pick.accident_history)}</span>` : ""}
+      ${pick.usage_history && pick.usage_history !== "unknown" ? `<span class="chip">${escapeHtml(pick.usage_history)}</span>` : ""}
+    </div>
+    <div class="vcard-top">
+      <span class="vin">${escapeHtml(pick.vin)}</span>
+      ${
+        url
+          ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">打开</a>`
+          : `<span class="muted">无链接</span>`
+      }
+    </div>
+  </article>`;
+}
+
+async function renderRecs() {
+  const targetId = requireTargetId();
+  const topN = state.recTopN || 3;
+  const data = await api(
+    `/api/targets/${encodeURIComponent(targetId)}/recommendations?top_n=${encodeURIComponent(topN)}`
+  );
+  const recs = data.recommendations || {};
+  const sections = recs.sections || [];
+  const scanLabel = recs.scan_id ? `扫描 ${recs.scan_id}` : "还没有扫描";
+  const warning =
+    recs.scan_id && !recs.scan_complete
+      ? `<div class="banner warn">最近一次扫描是部分扫描，推荐可能漏车，请先导入完整扫描。</div>`
+      : "";
+
+  $("page-recs").innerHTML = `
+    <div class="banner">
+      这里只展示<strong>当前在售</strong>车辆。下架、外省可买、已售的不会出现。网页不会去 Clutch 抓取，数据来自最近一次导入的库存。
+    </div>
+    ${warning}
+    <div class="kpis">
+      ${kpi("在售", recs.active_listings || 0, COLORS.green, Math.max(recs.active_listings || 0, 1))}
+      ${kpi("可推荐", recs.recommendable_listings || 0, COLORS.amber, Math.max(recs.active_listings || 0, 1))}
+      ${kpi("偏好匹配", recs.preference_matched || 0, COLORS.blue, Math.max(recs.active_listings || 0, 1))}
+      ${kpi("排除", recs.excluded || 0, COLORS.red, Math.max(recs.active_listings || 0, 1))}
+    </div>
+    <div class="row rec-toolbar">
+      ${
+        recs.scan_id
+          ? recs.scan_complete
+            ? badge("完整扫描", "on")
+            : badge("部分扫描", "warn")
+          : badge("无扫描", "")
+      }
+      <span class="muted mono">${escapeHtml(scanLabel)}</span>
+      <span class="muted">${escapeHtml(recs.inventory_updated_at || recs.generated_at || "")}</span>
+      <span style="flex:1"></span>
+      <label class="muted">每维 top
+        <input id="rec-top-n" type="number" min="1" value="${escapeHtml(topN)}" />
+      </label>
+      <button class="btn" id="rec-refresh" type="button">刷新</button>
+      <button class="btn primary" id="rec-write" type="button">写入报告</button>
+    </div>
+    <div class="muted rec-pref">${escapeHtml(recs.preference_summary || "")}</div>
+    ${
+      sections
+        .map((section) => {
+          const picks = section.picks || [];
+          return `<section class="rec-section">
+            <h2>${escapeHtml(section.title || "")}</h2>
+            <p>${escapeHtml(section.description || "")}</p>
+            <div class="cards">${picks.map(recPickCard).join("") || empty("这一维没有符合条件的在售车")}</div>
+          </section>`;
+        })
+        .join("") || empty("没有推荐。先在「导入」里放进一次完整扫描。")
+    }
+  `;
+
+  $("rec-top-n").addEventListener("change", () => {
+    const next = Number($("rec-top-n").value || 3);
+    state.recTopN = Number.isFinite(next) && next >= 1 ? next : 3;
+  });
+  $("rec-refresh").addEventListener("click", async (ev) => {
+    state.recTopN = Number($("rec-top-n").value || 3) || 3;
+    await withButton(ev.currentTarget, () => renderRecs());
+  });
+  $("rec-write").addEventListener("click", async (ev) => {
+    state.recTopN = Number($("rec-top-n").value || 3) || 3;
+    await withButton(ev.currentTarget, async () => {
+      const result = await api("/api/actions/generate-recommendations", {
+        method: "POST",
+        body: JSON.stringify({ target_id: targetId, top_n: state.recTopN }),
+      });
+      toast(`已写入 ${result.path}`);
+      await renderRecs();
+    });
+  });
 }
 
 async function renderInventory() {
