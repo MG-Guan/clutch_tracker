@@ -47,6 +47,27 @@ def test_index_serves_html(project_copy: Path):
     assert client.get("/static/app.js").status_code == 200
 
 
+def test_inventory_ui_links_charts_and_tags(project_copy: Path):
+    client = _client(project_copy)
+    js = client.get("/static/app.js").get_data(as_text=True)
+    assert "accidentBadge" in js
+    assert 'status === "clean"' in js
+    assert "无事故" in js
+    assert "trimSeriesBadge" in js
+    assert 'label = isLariat ? "Lariat"' in js
+    assert "data-vin" in js
+    assert "inv-scatter" in js
+    assert "bindChartCardLinks" in js
+    assert "vehiclePriceBars" in js
+    assert "inv-bars" in js
+    assert "niceTicks" in js
+    assert ">CAD</text>" in js
+    assert ">km</text>" in js
+    css = client.get("/static/app.css").get_data(as_text=True)
+    assert "#inv-cards .vcard.is-active" in css
+    assert ".vbar" in css
+
+
 def test_list_targets(project_copy: Path):
     response = _client(project_copy).get("/api/targets")
     assert response.status_code == 200
