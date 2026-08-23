@@ -1162,15 +1162,29 @@ $("target-select").addEventListener("change", () => {
   render();
 });
 
+async function pingOverview(timeoutMs = 800) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch("/api/overview", { cache: "no-store", signal: ctrl.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function waitForServer(tries = 50) {
+  let sawDown = false;
   for (let i = 0; i < tries; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 400));
-    try {
-      const res = await fetch("/api/overview", { cache: "no-store" });
-      if (res.ok) return;
-    } catch {
-      /* process is still coming up */
+    const ok = await pingOverview();
+    if (!ok) {
+      sawDown = true;
+      continue;
     }
+    if (sawDown) return;
   }
   throw new Error("重启后服务未恢复，请在终端查看 serve 输出");
 }
