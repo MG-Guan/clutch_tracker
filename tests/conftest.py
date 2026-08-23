@@ -16,13 +16,10 @@ def project_copy(tmp_path: Path) -> Path:
     root = Path(__file__).resolve().parents[1]
     dest = tmp_path / "clutch_tracker"
     shutil.copytree(root / "config", dest / "config")
-    (dest / "data" / "registry").mkdir(parents=True)
-    (dest / "data" / "raw_scans").mkdir(parents=True)
-    (dest / "data" / "targets").mkdir(parents=True)
+    (dest / "data").mkdir(parents=True)
     (dest / "reports" / "daily").mkdir(parents=True)
     (dest / "reports" / "summary").mkdir(parents=True)
     (dest / "reports" / "recommendations").mkdir(parents=True)
     (dest / "snapshots").mkdir(parents=True)
-    shutil.copy(root / "data" / "registry" / "targets.csv", dest / "data" / "registry" / "targets.csv")
     initialize_targets(dest)
     return dest

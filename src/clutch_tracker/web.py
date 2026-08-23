@@ -25,12 +25,12 @@ from clutch_tracker.recommendations import (
 )
 from clutch_tracker.reporting import generate_daily_report
 from clutch_tracker.storage import (
-    events_path,
+    list_raw_scans,
     load_current_inventory,
+    load_events,
+    load_observations,
+    load_raw_scan,
     load_vehicles,
-    observations_path,
-    raw_scan_archive_path,
-    read_csv_rows,
 )
 from clutch_tracker.target_manager import initialize_targets
 from clutch_tracker.validation import ValidationResult, validate_config, validate_repository
@@ -105,13 +105,13 @@ def create_app(root: Path | None = None) -> Flask:
     @app.get("/api/targets/<target_id>/observations")
     def api_observations(target_id: str):
         _require_target(_root(), target_id)
-        rows = read_csv_rows(observations_path(_root(), target_id))
+        rows = load_observations(_root(), target_id)
         return jsonify(_paginated("observations", rows))
 
     @app.get("/api/targets/<target_id>/events")
     def api_events(target_id: str):
         _require_target(_root(), target_id)
-        rows = read_csv_rows(events_path(_root(), target_id))
+        rows = load_events(_root(), target_id)
         parsed: list[dict[str, Any]] = []
         for row in rows:
             item = dict(row)
@@ -142,21 +142,27 @@ def create_app(root: Path | None = None) -> Flask:
 
     @app.get("/api/scans")
     def api_list_scans():
-        scan_dir = _root() / "data" / "raw_scans"
         files: list[dict[str, Any]] = []
-        if scan_dir.is_dir():
-            for path in sorted(scan_dir.glob("*.json"), key=lambda p: p.name, reverse=True):
-                files.append(_file_info(path))
+        for item in list_raw_scans(_root()):
+            files.append(
+                {
+                    "name": item["scan_id"],
+                    "scan_id": item["scan_id"],
+                    "target_id": item["target_id"],
+                    "scanned_at": item["scanned_at"],
+                    "scan_complete": item["scan_complete"],
+                    "archived_at": item["archived_at"],
+                    "size_bytes": item["size_bytes"],
+                }
+            )
         return jsonify({"ok": True, "scans": files})
 
     @app.get("/api/scans/<scan_id>")
     def api_read_scan(scan_id: str):
-        path = raw_scan_archive_path(_root(), _safe_scan_id(scan_id))
-        if not path.is_file():
+        payload = load_raw_scan(_root(), _safe_scan_id(scan_id))
+        if payload is None:
             return jsonify({"ok": False, "error": f"Scan not found: {scan_id}"}), 404
-        with path.open("r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-        return jsonify({"ok": True, "scan_id": scan_id, "path": str(path.relative_to(_root())), "payload": payload})
+        return jsonify({"ok": True, "scan_id": scan_id, "payload": payload})
 
     @app.post("/api/scans")
     def api_import_scan():
@@ -282,6 +288,20 @@ def restart_argv(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> list[str
     ]
 
 
+def _close_nonstdio_fds() -> None:
+    """Close inherited listen sockets so the replacement process can bind again."""
+    try:
+        fd_limit = os.sysconf("SC_OPEN_MAX")
+    except (ValueError, OSError):
+        fd_limit = 256
+    fd_limit = min(max(int(fd_limit), 8), 1024)
+    for fd in range(3, fd_limit):
+        try:
+            os.close(fd)
+        except OSError:
+            continue
+
+
 def schedule_restart(app: Flask, *, delay_s: float = 0.6) -> bool:
     """Restart the live serve process after the HTTP response is flushed."""
     if not app.config.get("CLUTCH_ALLOW_RESTART"):
@@ -298,6 +318,7 @@ def schedule_restart(app: Flask, *, delay_s: float = 0.6) -> bool:
         logger.info("Restarting serve process: %s", argv)
         if cwd:
             os.chdir(str(cwd))
+        _close_nonstdio_fds()
         os.execv(argv[0], argv)
 
     threading.Timer(delay_s, _restart).start()

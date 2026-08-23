@@ -18,11 +18,10 @@ from clutch_tracker.criteria import (
 from clutch_tracker.models import CurrentInventory, TargetCriteria, VehicleRecord
 from clutch_tracker.storage import (
     atomic_write,
-    events_path,
     load_current_inventory,
+    load_events,
     load_vehicles,
     now_iso,
-    read_csv_rows,
     recommendations_report_dir,
 )
 
@@ -137,7 +136,7 @@ def build_recommendations(
 
     inventory = load_current_inventory(root_path, target_id)
     vehicles = load_vehicles(root_path, target_id)
-    events = read_csv_rows(events_path(root_path, target_id))
+    events = load_events(root_path, target_id)
     targets_by_id = {target.target_id: target for target in load_targets(root_path)}
     target = targets_by_id.get(target_id)
     preferences = (

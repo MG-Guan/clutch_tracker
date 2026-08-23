@@ -4,9 +4,11 @@ This document guides AI agents working on `clutch_tracker`.
 
 ## Source of Truth
 
-- **GitHub repository files** are the authoritative historical database.
-- Never use agent memory as a substitute for on-disk vehicle history.
-- All tracked vehicle criteria must come from `config/targets.yaml`.
+- **Local SQLite database** (`data/clutch_tracker.db`, gitignored) is the authoritative
+  historical store for vehicles, observations, events, inventory, and raw scans.
+- Never use agent memory as a substitute for local vehicle history.
+- Never commit the database or scan history into GitHub.
+- All tracked vehicle criteria must come from `config/targets.yaml` (still in git).
 - Do not hard-code specific vehicles (make/model/year) in Python code.
 
 ## Architecture
@@ -15,15 +17,15 @@ This document guides AI agents working on `clutch_tracker`.
 Browser Agent (raw scan JSON)
         │
         ▼
-import-scan CLI  ──►  data/raw_scans/<scan_id>.json  (archive)
+import-scan CLI  ──►  raw_scans table in data/clutch_tracker.db
         │
         ▼
-Deterministic Python (comparison.py, events.py, storage.py)
+Deterministic Python (comparison.py, events.py, storage.py / db.py)
         │
-        ├── data/targets/<target_id>/vehicles.csv       (VIN registry)
-        ├── data/targets/<target_id>/observations.csv   (append-only)
-        ├── data/targets/<target_id>/listing_events.csv (append-only)
-        └── data/targets/<target_id>/current_inventory.json
+        ├── vehicles            (VIN registry)
+        ├── observations        (append-only)
+        ├── listing_events      (append-only)
+        └── current_inventory   (latest snapshot JSON blob)
 ```
 
 ## Key Rules
@@ -33,8 +35,9 @@ Deterministic Python (comparison.py, events.py, storage.py)
 3. **Observations are append-only** — never overwrite or delete historical rows.
 4. **Partial scans** (`scan_complete: false`) must NOT mark missing vehicles as removed.
 5. **Unknown values stay unknown** — do not guess or infer missing fields.
-6. **Atomic file writes** — all persistence uses temp-file + rename.
+6. **Local DB is truth** — content lives in SQLite; config YAML stays in git.
 7. **Timestamps** — ISO 8601 in `America/Toronto` timezone.
+8. **Reports/snapshots** are generated artifacts under gitignored dirs (regenerable).
 
 ## CLI Commands
 
@@ -125,16 +128,17 @@ recommendations report adds a `Usage/Registration` column plus a
 ## Data Layout
 
 ```
-data/targets/<target_id>/
-├── vehicles.csv
-├── observations.csv
-├── listing_events.csv
-└── current_inventory.json
+data/clutch_tracker.db       # Local SQLite (gitignored) — all vehicle history
+config/targets.yaml          # Search criteria (in git)
+config/settings.yaml         # Timezone + storage.database_path
 
-reports/daily/<target_id>/
-reports/recommendations/<target_id>/
-snapshots/<target_id>/
+reports/daily/<target_id>/           # Generated markdown (gitignored)
+reports/recommendations/<target_id>/ # Generated markdown (gitignored)
+snapshots/<target_id>/               # Generated inventory snapshots (gitignored)
 ```
+
+On first open, any leftover legacy CSV/JSON under `data/targets/` or `data/raw_scans/`
+is imported into SQLite automatically once.
 
 ## What Agents Should NOT Do
 

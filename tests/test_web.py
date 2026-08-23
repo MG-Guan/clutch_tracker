@@ -109,7 +109,8 @@ def test_import_scan_and_inventory(project_copy: Path):
 
     scans = client.get("/api/scans")
     names = [row["name"] for row in scans.get_json()["scans"]]
-    assert "scan_test_001.json" in names
+    assert "scan_test_001" in names
+    assert any(row.get("scan_id") == "scan_test_001" for row in scans.get_json()["scans"])
 
 
 def test_import_scan_file_upload(project_copy: Path):
@@ -227,6 +228,16 @@ def test_restart_argv_keeps_serve_command(monkeypatch):
     argv = restart_argv("127.0.0.1", 9000)
     assert argv[1:] == ["clutch-tracker", "serve", "--port", "9000"]
     assert "serve" in argv
+
+
+def test_restart_closes_inherited_sockets_before_exec():
+    import inspect
+
+    from clutch_tracker.web import schedule_restart
+
+    source = inspect.getsource(schedule_restart)
+    assert "_close_nonstdio_fds" in source
+    assert "os.execv" in source
 
 
 def test_observations_and_events_pagination(project_copy: Path):

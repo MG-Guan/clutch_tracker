@@ -4,18 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from clutch_tracker.db import database_path
 from clutch_tracker.models import CurrentInventory, InventoryVehicle, Observation, VehicleRecord
 from clutch_tracker.storage import (
     append_observations,
     atomic_write,
     load_current_inventory,
+    load_observations,
     load_vehicles,
     now_iso,
-    observations_path,
-    read_csv_rows,
     save_current_inventory,
     save_vehicles,
-    vehicles_path,
 )
 
 
@@ -50,7 +49,7 @@ def test_append_observations_is_append_only(project_copy: Path):
     append_observations(project_copy, [obs1])
     append_observations(project_copy, [obs2])
 
-    rows = read_csv_rows(observations_path(project_copy, target_id))
+    rows = load_observations(project_copy, target_id)
     assert len(rows) == 2
     assert rows[0]["observation_id"] == "obs_1"
     assert rows[1]["observation_id"] == "obs_2"
@@ -70,7 +69,7 @@ def test_save_and_load_vehicles(project_copy: Path):
     save_vehicles(project_copy, target_id, vehicles)
     loaded = load_vehicles(project_copy, target_id)
     assert loaded["VIN123"].make == "TestMake"
-    assert vehicles_path(project_copy, target_id).exists()
+    assert database_path(project_copy).exists()
 
 
 def test_save_and_load_inventory_risk_metadata(project_copy: Path):

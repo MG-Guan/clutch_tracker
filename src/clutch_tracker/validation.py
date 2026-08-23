@@ -2,33 +2,15 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from clutch_tracker.config import load_settings, load_targets, load_targets_config, project_root
-from clutch_tracker.storage import (
-    EVENTS_HEADERS,
-    OBSERVATIONS_HEADERS,
-    REGISTRY_HEADERS,
-    VEHICLES_HEADERS,
-    events_path,
-    inventory_path,
-    observations_path,
-    read_csv_rows,
-    registry_path,
-    vehicles_path,
-)
+from clutch_tracker.db import connection, database_path
+from clutch_tracker.storage import ensure_database, load_current_inventory, load_registry, load_vehicles
 
 logger = logging.getLogger(__name__)
-
-REQUIRED_TARGET_FILES = [
-    "vehicles.csv",
-    "observations.csv",
-    "listing_events.csv",
-    "current_inventory.json",
-]
 
 
 @dataclass
@@ -136,66 +118,40 @@ def validate_config(root: Path | None = None) -> ValidationResult:
     return combined
 
 
-def _validate_csv_headers(path: Path, expected: list[str], result: ValidationResult, label: str) -> None:
-    if not path.exists():
-        result.add_error(f"Missing {label}: {path}")
-        return
-    with path.open("r", encoding="utf-8") as handle:
-        first_line = handle.readline().strip()
-    if not first_line:
-        result.add_warning(f"Empty {label}: {path}")
-        return
-    actual = [h.strip() for h in first_line.split(",")]
-    if actual != expected:
-        result.add_error(f"{label} header mismatch in {path}: expected {expected}, got {actual}")
-
-
 def validate_target_data(root: Path, target_id: str) -> ValidationResult:
-    """Validate on-disk data for a single target."""
+    """Validate local database content for a single target."""
     result = ValidationResult()
-    target_root = root / "data" / "targets" / target_id
+    ensure_database(root)
 
-    if not target_root.is_dir():
-        result.add_error(f"Target data directory missing: {target_root}")
+    inventory = load_current_inventory(root, target_id)
+    if inventory is None:
+        result.add_error(f"Missing current inventory for {target_id}")
         return result
 
-    for filename in REQUIRED_TARGET_FILES:
-        path = target_root / filename
-        if not path.exists():
-            result.add_error(f"Missing required file for {target_id}: {filename}")
+    if inventory.target_id != target_id:
+        result.add_error(f"Inventory target_id mismatch for {target_id}")
 
-    _validate_csv_headers(
-        vehicles_path(root, target_id), VEHICLES_HEADERS, result, f"{target_id} vehicles.csv"
-    )
-    _validate_csv_headers(
-        observations_path(root, target_id), OBSERVATIONS_HEADERS, result, f"{target_id} observations.csv"
-    )
-    _validate_csv_headers(
-        events_path(root, target_id), EVENTS_HEADERS, result, f"{target_id} listing_events.csv"
-    )
-
-    inv_path = inventory_path(root, target_id)
-    if inv_path.exists():
-        try:
-            with inv_path.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
-            if data.get("target_id") != target_id:
-                result.add_error(f"Inventory target_id mismatch in {inv_path}")
-            if "vehicles" not in data or not isinstance(data["vehicles"], list):
-                result.add_error(f"Inventory missing vehicles list in {inv_path}")
-        except json.JSONDecodeError as exc:
-            result.add_error(f"Invalid JSON in {inv_path}: {exc}")
-
-    vehicles = read_csv_rows(vehicles_path(root, target_id))
+    vehicles = load_vehicles(root, target_id)
     vins_seen: set[str] = set()
-    for row in vehicles:
-        vin = row.get("vin", "").strip()
+    for vin in vehicles:
         if not vin:
             result.add_error(f"{target_id}: vehicle row missing VIN")
             continue
         if vin in vins_seen:
-            result.add_error(f"{target_id}: duplicate VIN in vehicles.csv: {vin}")
+            result.add_error(f"{target_id}: duplicate VIN in vehicles: {vin}")
         vins_seen.add(vin)
+
+    with connection(root) as conn:
+        for table, label in (
+            ("observations", "observations"),
+            ("listing_events", "listing_events"),
+        ):
+            row = conn.execute(
+                f"SELECT COUNT(*) AS n FROM {table} WHERE target_id = ?",
+                (target_id,),
+            ).fetchone()
+            if row is None:
+                result.add_warning(f"{target_id}: unable to count {label}")
 
     return result
 
@@ -211,11 +167,14 @@ def validate_repository(root: Path | None = None) -> ValidationResult:
     if not config_result.ok:
         result.ok = False
 
-    registry = registry_path(root_path)
-    if not registry.exists():
-        result.add_warning(f"Registry missing: {registry}")
+    ensure_database(root_path)
+    db_path = database_path(root_path)
+    if not db_path.exists():
+        result.add_error(f"Local database missing: {db_path}")
     else:
-        _validate_csv_headers(registry, REGISTRY_HEADERS, result, "targets registry")
+        registry = load_registry(root_path)
+        if not registry:
+            result.add_warning("Target registry is empty; run initialize-targets")
 
     try:
         targets = load_targets(root_path)

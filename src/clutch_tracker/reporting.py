@@ -11,11 +11,10 @@ from clutch_tracker.storage import (
     atomic_write,
     daily_report_dir,
     load_current_inventory,
+    load_events,
     load_vehicles,
     now_iso,
-    read_csv_rows,
     snapshot_dir,
-    events_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ def generate_daily_report(root: Path | None, target_id: str) -> Path:
 
     inventory = load_current_inventory(root_path, target_id)
     vehicles = load_vehicles(root_path, target_id)
-    events = read_csv_rows(events_path(root_path, target_id))
+    events = load_events(root_path, target_id)
 
     report_dir = daily_report_dir(root_path, target_id)
     report_dir.mkdir(parents=True, exist_ok=True)

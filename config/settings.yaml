@@ -2,6 +2,8 @@ timezone: America/Toronto
 timestamp_format: iso8601
 
 storage:
+  backend: sqlite
+  database_path: data/clutch_tracker.db
   atomic_writes: true
 
 logging:
