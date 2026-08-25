@@ -43,6 +43,10 @@ def test_index_serves_html(project_copy: Path):
     assert "推荐" in html
     assert "扫描" in html
     assert 'data-page="import"' in html
+    js = client.get("/static/app.js").get_data(as_text=True)
+    assert "scheduleBanner" in js
+    assert "btn-trigger-scan" in js
+    assert "/api/actions/trigger-scan" in js
     assert client.get("/static/app.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
 

@@ -491,6 +491,7 @@ async function renderOverview() {
       ${kpi("VIN", t.tracked_vins, COLORS.blue, Math.max(t.tracked_vins, 1))}
       ${kpi("目标", t.targets, COLORS.amber, Math.max(t.targets, 1))}
     </div>
+    ${scheduleBanner(overview.schedule)}
     <div class="ops-grid" style="margin-bottom:12px">
       <button class="op-tile" id="btn-goto-recs" type="button">
         <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
@@ -513,6 +514,43 @@ async function renderOverview() {
   $("btn-goto-recs").addEventListener("click", () => showPage("recs"));
   $("btn-goto-inv").addEventListener("click", () => showPage("inventory"));
   $("btn-goto-import").addEventListener("click", () => showPage("import"));
+  const runScheduleBtn = $("btn-run-schedule");
+  if (runScheduleBtn) {
+    runScheduleBtn.addEventListener("click", async (ev) => {
+      await withButton(ev.currentTarget, async () => {
+        await api("/api/actions/run-schedule", { method: "POST", body: "{}" });
+        toast("已跑完一轮调度");
+        await renderOverview();
+      });
+    });
+  }
+  const gotoImportFromSchedule = $("btn-goto-import-from-schedule");
+  if (gotoImportFromSchedule) {
+    gotoImportFromSchedule.addEventListener("click", () => showPage("import"));
+  }
+}
+
+function scheduleBanner(schedule) {
+  const s = schedule || {};
+  if (!s.active) {
+    return `<div class="banner">本机调度未启动：只有 <code>clutch-tracker serve</code> 在跑时才会每 ${escapeHtml(String(s.interval_hours || 3))} 小时自动生成推荐并提醒扫描。</div>`;
+  }
+  const pending = Array.isArray(s.pending_scans) ? s.pending_scans.length : 0;
+  const next = s.next_run_at ? escapeHtml(String(s.next_run_at).slice(0, 16)) : "—";
+  const last = s.last_cycle?.finished_at
+    ? escapeHtml(String(s.last_cycle.finished_at).slice(0, 16))
+    : "还没有";
+  const hours = Number(s.interval_hours || 3);
+  const hoursLabel = Number.isFinite(hours) ? hours.toFixed(hours % 1 ? 1 : 0) : "3";
+  return `<div class="banner">
+    <strong>本机调度已开启</strong>：每 ${escapeHtml(hoursLabel)} 小时自动生成推荐/日报，并标记待扫描
+    （网页不会自己抓 Clutch）。下次 ${next} · 上次 ${last}
+    ${pending ? ` · 待扫描 ${pending}` : ""}
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btn-run-schedule" type="button">立即跑一轮</button>
+      <button class="btn" id="btn-goto-import-from-schedule" type="button">去扫描页</button>
+    </div>
+  </div>`;
 }
 
 function recPickCard(pick) {
@@ -877,22 +915,31 @@ async function renderHistory() {
 
 async function renderImport() {
   const targetId = requireTargetId();
-  const [scans, detail] = await Promise.all([
+  const [scans, detail, schedule] = await Promise.all([
     api("/api/scans"),
     api(`/api/targets/${encodeURIComponent(targetId)}`),
+    api("/api/schedule").catch(() => ({ active: false, pending_scans: [] })),
   ]);
   const searchUrl = detail.target?.search_url;
   const c = detail.target?.criteria || {};
+  const pending = (schedule.pending_scans || []).find((s) => s.target_id === targetId);
   $("page-import").innerHTML = `
     <div class="banner">
-      <strong>扫描</strong>：网页不会自己去 Clutch 抓取。打开搜索页用浏览器扫完，把 JSON 拖到下面，再回「推荐」看当前还能买的车。
+      <strong>扫描</strong>：点「触发扫描」打开 Clutch 搜索页；用浏览器 Agent 扫完后把 JSON 拖进来导入。
+      网页本身不会抓取 Clutch。
+      ${pending ? `<div style="margin-top:6px">待扫描已标记 · ${escapeHtml((pending.requested_at || "").slice(0, 16))}</div>` : ""}
     </div>
     <div class="ops-grid" style="margin-bottom:12px">
+      <button class="op-tile" id="btn-trigger-scan" type="button">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        触发扫描
+        <span class="muted">打开搜索并标记待扫描</span>
+      </button>
       ${
         searchUrl
           ? `<a class="op-tile" id="open-clutch" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener">
               <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-              打开 Clutch 搜索
+              仅打开 Clutch
               <span class="muted">${escapeHtml([c.make, c.model, c.province].filter(Boolean).join(" · "))}</span>
             </a>`
           : ""
@@ -903,6 +950,7 @@ async function renderImport() {
         <span class="muted">导入之后点这里</span>
       </button>
     </div>
+    <div id="trigger-scan-result"></div>
     <div id="dropzone" class="dropzone">
       <svg class="drop-icon" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
       <div>把扫描 JSON 拖到这里，或点这里选文件</div>
@@ -920,6 +968,24 @@ async function renderImport() {
   `;
 
   $("scan-goto-recs").addEventListener("click", () => showPage("recs"));
+  $("btn-trigger-scan").addEventListener("click", async (ev) => {
+    await withButton(ev.currentTarget, async () => {
+      const result = await api("/api/actions/trigger-scan", {
+        method: "POST",
+        body: JSON.stringify({ target_id: targetId, open_browser: true }),
+      });
+      const scan = result.scan || {};
+      if (scan.search_url) {
+        window.open(scan.search_url, "_blank", "noopener");
+      }
+      toast(scan.search_url ? "已打开 Clutch 搜索" : "已标记待扫描");
+      $("trigger-scan-result").innerHTML = `<div class="banner" style="margin-bottom:12px">
+        已触发 <b>${escapeHtml(scan.target_id || targetId)}</b>
+        ${scan.requested_at ? ` · ${escapeHtml(String(scan.requested_at).slice(0, 16))}` : ""}
+        <div class="muted" style="margin-top:6px">用浏览器 Agent 按搜索条件扫完后，把 JSON 拖到下方导入。</div>
+      </div>`;
+    });
+  });
   const dropzone = $("dropzone");
   const fileInput = $("scan-file");
   dropzone.addEventListener("click", () => fileInput.click());

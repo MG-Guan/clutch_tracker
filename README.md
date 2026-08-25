@@ -85,6 +85,14 @@ clutch-tracker list-targets
 python -m clutch_tracker list-targets
 ```
 
+Local UI + schedule (while this process is running):
+
+```bash
+clutch-tracker serve
+```
+
+Default: every 3 hours regenerate recommendations/daily reports and mark browser scans as due (`config/settings.yaml` → `schedule`). Stops when `serve` exits. Does **not** scrape Clutch.ca.
+
 ### Troubleshooting
 
 **`ModuleNotFoundError: No module named 'clutch_tracker'` (sometimes works, sometimes fails)**

@@ -24,3 +24,13 @@ reporting:
 
 scan:
   require_scan_complete_for_removals: true
+
+# Runs only while `clutch-tracker serve` is alive. Stops when the process exits.
+schedule:
+  enabled: true
+  interval_hours: 3
+  run_on_startup: false
+  generate_recommendations: true
+  generate_daily_report: true
+  request_browser_scan: true
+  open_search_url: false

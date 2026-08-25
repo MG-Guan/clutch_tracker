@@ -24,6 +24,7 @@ from clutch_tracker.recommendations import (
     recommendations_payload,
 )
 from clutch_tracker.reporting import generate_daily_report
+from clutch_tracker.scheduler import LocalScheduler, try_open_url
 from clutch_tracker.storage import (
     list_raw_scans,
     load_current_inventory,
@@ -46,11 +47,12 @@ class UnknownTargetError(LookupError):
     """Raised when a target_id is not in config."""
 
 
-def create_app(root: Path | None = None) -> Flask:
+def create_app(root: Path | None = None, *, scheduler: LocalScheduler | None = None) -> Flask:
     """Create the local operations Flask app bound to a project root."""
     app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
     app.config["CLUTCH_ROOT"] = project_root(root)
     app.config["CLUTCH_ALLOW_RESTART"] = False
+    app.config["CLUTCH_SCHEDULER"] = scheduler
 
     @app.get("/")
     def index():
@@ -171,7 +173,87 @@ def create_app(root: Path | None = None) -> Flask:
             summary = import_scan(_root(), data)
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
+        scheduler = _scheduler()
+        target_id = summary.get("target_id") or data.get("target_id")
+        if scheduler is not None and target_id:
+            scheduler.note_scan_imported(str(target_id))
         return jsonify({"ok": True, "summary": summary})
+
+    @app.get("/api/schedule")
+    def api_schedule_status():
+        scheduler = _scheduler()
+        if scheduler is None:
+            return jsonify(
+                {
+                    "ok": True,
+                    "active": False,
+                    "enabled": False,
+                    "message": "Scheduler runs only while clutch-tracker serve is alive.",
+                }
+            )
+        return jsonify({"ok": True, **scheduler.status()})
+
+    @app.post("/api/actions/run-schedule")
+    def api_run_schedule():
+        scheduler = _scheduler()
+        if scheduler is None:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Scheduler is only available from a live clutch-tracker serve process.",
+                }
+            ), 400
+        try:
+            cycle = scheduler.run_cycle(reason="manual")
+        except RuntimeError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 409
+        return jsonify({"ok": True, "cycle": scheduler.status()["last_cycle"], "finished": cycle.ok})
+
+    @app.post("/api/actions/trigger-scan")
+    def api_trigger_scan():
+        """Mark a browser scan as due and return the Clutch search payload."""
+        body = request.get_json(silent=True) or {}
+        target_id = body.get("target_id") or request.args.get("target_id")
+        if not target_id:
+            return jsonify({"ok": False, "error": "target_id is required"}), 400
+        open_browser = body.get("open_browser", True)
+        if isinstance(open_browser, str):
+            open_browser = open_browser.strip().lower() not in {"0", "false", "no"}
+
+        target = _require_target(_root(), str(target_id))
+        criteria = build_search_criteria(target)
+        search_url = criteria.get("search_url")
+        if not isinstance(search_url, str) or not search_url.strip():
+            search_url = None
+
+        scheduler = _scheduler()
+        if scheduler is not None:
+            payload = scheduler.request_scan(
+                str(target_id),
+                reason="web",
+                open_browser=bool(open_browser),
+            )
+        else:
+            opened = bool(open_browser and search_url and try_open_url(search_url))
+            payload = {
+                "target_id": target.target_id,
+                "label": target.label,
+                "requested_at": None,
+                "reason": "web",
+                "search_url": search_url,
+                "opened_locally": opened,
+                "scan_requirements": criteria.get("scan_requirements"),
+                "criteria": criteria.get("criteria"),
+                "note": "Serve scheduler is not active; open Clutch and import scan JSON manually.",
+            }
+
+        return jsonify(
+            {
+                "ok": True,
+                "scan": payload,
+                "message": "Open Clutch, collect scan JSON with a browser agent, then import it here.",
+            }
+        )
 
     @app.post("/api/actions/validate-config")
     def api_validate_config():
@@ -261,15 +343,25 @@ def create_app(root: Path | None = None) -> Flask:
 
 def run_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None) -> None:
     """Start the local web UI (development server, intended for localhost use)."""
-    app = create_app(root)
     root_path = project_root(root)
+    scheduler = LocalScheduler(root_path)
+    app = create_app(root_path, scheduler=scheduler)
     app.config["CLUTCH_ALLOW_RESTART"] = True
     app.config["CLUTCH_RESTART_ARGV"] = restart_argv(host, port)
     app.config["CLUTCH_RESTART_CWD"] = str(root_path)
+    scheduler.start()
     url = f"http://{host}:{port}/"
     logger.info("Starting clutch_tracker web UI at %s", url)
     print(f"Clutch Tracker UI: {url}")
-    app.run(host=host, port=port, threaded=True, use_reloader=False)
+    if scheduler.enabled:
+        print(
+            f"Local schedule: every {scheduler.interval_seconds / 3600:.1f}h "
+            "(recommendations + scan reminder while serve is running)"
+        )
+    try:
+        app.run(host=host, port=port, threaded=True, use_reloader=False)
+    finally:
+        scheduler.stop()
 
 
 def restart_argv(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> list[str]:
@@ -329,6 +421,11 @@ def _root() -> Path:
     return Path(current_app.config["CLUTCH_ROOT"])
 
 
+def _scheduler() -> LocalScheduler | None:
+    value = current_app.config.get("CLUTCH_SCHEDULER")
+    return value if isinstance(value, LocalScheduler) else None
+
+
 def _parse_top_n(value: Any) -> int:
     try:
         top_n_int = int(value)
@@ -373,7 +470,8 @@ def _list_targets(root: Path) -> list[dict[str, Any]]:
 def _overview(root: Path) -> dict[str, Any]:
     targets = _list_targets(root)
     settings = load_settings(root)
-    return {
+    scheduler = _scheduler()
+    payload: dict[str, Any] = {
         "ok": True,
         "timezone": settings.get("timezone", "America/Toronto"),
         "totals": {
@@ -384,7 +482,13 @@ def _overview(root: Path) -> dict[str, Any]:
             "tracked_vins": sum(t["tracked_vins"] for t in targets),
         },
         "targets": targets,
+        "schedule": scheduler.status() if scheduler is not None else {
+            "active": False,
+            "enabled": False,
+            "message": "Scheduler runs only while clutch-tracker serve is alive.",
+        },
     }
+    return payload
 
 
 def _validation_payload(result: ValidationResult) -> dict[str, Any]:

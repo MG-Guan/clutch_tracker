@@ -38,6 +38,10 @@ Deterministic Python (comparison.py, events.py, storage.py / db.py)
 6. **Local DB is truth** — content lives in SQLite; config YAML stays in git.
 7. **Timestamps** — ISO 8601 in `America/Toronto` timezone.
 8. **Reports/snapshots** are generated artifacts under gitignored dirs (regenerable).
+9. **Local schedule** — while `clutch-tracker serve` is running, a background
+   scheduler (default every 3h) regenerates recommendations/daily reports and
+   marks browser scans as due. It stops when the serve process exits. Python
+   still does not scrape Clutch.ca.
 
 ## CLI Commands
 
