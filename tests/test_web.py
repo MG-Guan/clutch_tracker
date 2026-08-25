@@ -43,8 +43,33 @@ def test_index_serves_html(project_copy: Path):
     assert "推荐" in html
     assert "扫描" in html
     assert 'data-page="import"' in html
+    js = client.get("/static/app.js").get_data(as_text=True)
+    assert "scheduleBanner" in js
+    assert "btn-trigger-scan" in js
+    assert "/api/actions/trigger-scan" in js
     assert client.get("/static/app.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
+
+
+def test_inventory_ui_links_charts_and_tags(project_copy: Path):
+    client = _client(project_copy)
+    js = client.get("/static/app.js").get_data(as_text=True)
+    assert "accidentBadge" in js
+    assert 'status === "clean"' in js
+    assert "无事故" in js
+    assert "trimSeriesBadge" in js
+    assert 'label = isLariat ? "Lariat"' in js
+    assert "data-vin" in js
+    assert "inv-scatter" in js
+    assert "bindChartCardLinks" in js
+    assert "vehiclePriceBars" in js
+    assert "inv-bars" in js
+    assert "niceTicks" in js
+    assert ">CAD</text>" in js
+    assert ">km</text>" in js
+    css = client.get("/static/app.css").get_data(as_text=True)
+    assert "#inv-cards .vcard.is-active" in css
+    assert ".vbar" in css
 
 
 def test_list_targets(project_copy: Path):
@@ -88,7 +113,8 @@ def test_import_scan_and_inventory(project_copy: Path):
 
     scans = client.get("/api/scans")
     names = [row["name"] for row in scans.get_json()["scans"]]
-    assert "scan_test_001.json" in names
+    assert "scan_test_001" in names
+    assert any(row.get("scan_id") == "scan_test_001" for row in scans.get_json()["scans"])
 
 
 def test_import_scan_file_upload(project_copy: Path):
@@ -206,6 +232,16 @@ def test_restart_argv_keeps_serve_command(monkeypatch):
     argv = restart_argv("127.0.0.1", 9000)
     assert argv[1:] == ["clutch-tracker", "serve", "--port", "9000"]
     assert "serve" in argv
+
+
+def test_restart_closes_inherited_sockets_before_exec():
+    import inspect
+
+    from clutch_tracker.web import schedule_restart
+
+    source = inspect.getsource(schedule_restart)
+    assert "_close_nonstdio_fds" in source
+    assert "os.execv" in source
 
 
 def test_observations_and_events_pagination(project_copy: Path):

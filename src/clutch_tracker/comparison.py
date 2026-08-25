@@ -32,11 +32,9 @@ from clutch_tracker.storage import (
     load_vehicles,
     new_id,
     normalize_optional_str,
-    now_iso,
-    raw_scan_archive_path,
     save_current_inventory,
+    save_raw_scan,
     save_vehicles,
-    atomic_write_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -581,9 +579,8 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     root_path = project_root(root)
     payload = parse_scan_payload(scan_data)
 
-    archive_path = raw_scan_archive_path(root_path, payload.scan_id)
-    atomic_write_json(archive_path, scan_data)
-    logger.info("Archived raw scan to %s", archive_path)
+    save_raw_scan(root_path, payload.scan_id, scan_data)
+    logger.info("Archived raw scan %s to local database", payload.scan_id)
 
     existing_vehicles = load_vehicles(root_path, payload.target_id)
     previous_inventory = load_current_inventory(root_path, payload.target_id)

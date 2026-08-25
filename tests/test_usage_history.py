@@ -7,7 +7,7 @@ from pathlib import Path
 
 from clutch_tracker.comparison import import_scan
 from clutch_tracker.recommendations import generate_recommendations_report
-from clutch_tracker.storage import events_path, load_current_inventory, read_csv_rows
+from clutch_tracker.storage import load_current_inventory, load_events
 from clutch_tracker.usage_history import assess_usage_history
 
 
@@ -110,7 +110,7 @@ def test_import_scan_flags_commercial_and_interprovincial(project_copy: Path):
     # Disclosure must not change recommendation eligibility.
     assert vehicle.recommendation_eligible is True
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     usage_events = [e for e in events if e["event_type"] == "usage_history_assessed"]
     assert len(usage_events) == 1
     details = json.loads(usage_events[0]["details_json"])

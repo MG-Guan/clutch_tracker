@@ -2,26 +2,19 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
 from clutch_tracker.config import load_targets, project_root
+from clutch_tracker.db import connection
 from clutch_tracker.storage import (
-    EVENTS_HEADERS,
-    OBSERVATIONS_HEADERS,
-    VEHICLES_HEADERS,
     daily_report_dir,
-    events_path,
-    inventory_path,
+    ensure_database,
+    ensure_empty_inventory,
+    load_registry,
     now_iso,
-    observations_path,
-    registry_path,
     save_registry,
     snapshot_dir,
-    vehicles_path,
-    write_csv_rows,
-    atomic_write_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,32 +22,27 @@ logger = logging.getLogger(__name__)
 
 def initialize_targets(root: Path | None = None, *, force: bool = False) -> list[str]:
     """
-    Initialize on-disk structures for all configured targets.
+    Initialize local database structures for all configured targets.
 
     Returns list of initialized target_ids.
     """
     root_path = project_root(root)
+    ensure_database(root_path)
     targets = load_targets(root_path)
     timestamp = now_iso(root_path)
     initialized: list[str] = []
 
-    registry_rows: list[dict[str, str]] = []
-    if registry_path(root_path).exists() and not force:
-        from clutch_tracker.storage import load_registry
-
-        existing_registry = {r["target_id"]: r for r in load_registry(root_path)}
-    else:
+    existing_registry = {r["target_id"]: dict(r) for r in load_registry(root_path)}
+    if force:
         existing_registry = {}
+
+    registry_rows: list[dict[str, str]] = []
 
     for target in targets:
         target_id = target.target_id
-        data_dir = root_path / "data" / "targets" / target_id
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        _init_csv(vehicles_path(root_path, target_id), VEHICLES_HEADERS, force)
-        _init_csv(observations_path(root_path, target_id), OBSERVATIONS_HEADERS, force)
-        _init_csv(events_path(root_path, target_id), EVENTS_HEADERS, force)
-        _init_inventory(root_path, target_id, force)
+        if force:
+            _clear_target_content(root_path, target_id)
+        ensure_empty_inventory(root_path, target_id, force=force)
 
         daily_report_dir(root_path, target_id).mkdir(parents=True, exist_ok=True)
         snapshot_dir(root_path, target_id).mkdir(parents=True, exist_ok=True)
@@ -80,21 +68,9 @@ def initialize_targets(root: Path | None = None, *, force: bool = False) -> list
     return initialized
 
 
-def _init_csv(path: Path, headers: list[str], force: bool) -> None:
-    if path.exists() and not force:
-        return
-    write_csv_rows(path, headers, [])
-
-
-def _init_inventory(root: Path, target_id: str, force: bool) -> None:
-    path = inventory_path(root, target_id)
-    if path.exists() and not force:
-        return
-    payload = {
-        "target_id": target_id,
-        "updated_at": now_iso(root),
-        "scan_id": None,
-        "scan_complete": False,
-        "vehicles": [],
-    }
-    atomic_write_json(path, payload)
+def _clear_target_content(root: Path, target_id: str) -> None:
+    with connection(root) as conn:
+        conn.execute("DELETE FROM vehicles WHERE target_id = ?", (target_id,))
+        conn.execute("DELETE FROM observations WHERE target_id = ?", (target_id,))
+        conn.execute("DELETE FROM listing_events WHERE target_id = ?", (target_id,))
+        conn.execute("DELETE FROM current_inventory WHERE target_id = ?", (target_id,))

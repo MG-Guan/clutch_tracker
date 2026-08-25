@@ -14,11 +14,19 @@ venv/
 *.log
 .DS_Store
 
-# Runtime data (keep structure, ignore generated content)
+# Local content database (never commit vehicle history)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Legacy file storage / generated artifacts (keep structure only)
 data/raw_scans/*
 !data/raw_scans/.gitkeep
 data/targets/*/
 !data/targets/.gitkeep
+data/registry/*
+!data/registry/.gitkeep
 reports/daily/*/
 !reports/daily/.gitkeep
 reports/recommendations/*/

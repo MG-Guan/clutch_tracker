@@ -12,6 +12,10 @@ const state = {
   targetId: localStorage.getItem("clutch.targetId") || "",
   targets: [],
   invFilter: "active",
+  invQuery: "",
+  invYear: "",
+  invSelectedVin: "",
+  invHoverVin: "",
   reportKind: "daily",
   recTopN: 3,
 };
@@ -62,6 +66,39 @@ function km(value) {
 
 function badge(text, cls) {
   return `<span class="badge ${cls || ""}">${escapeHtml(text)}</span>`;
+}
+
+function accidentBadge(status) {
+  const bucket = accidentBucket(status);
+  const cls = bucket.key === "reported" ? "removed" : bucket.key === "clean" ? "on" : "";
+  return badge(bucket.label, cls);
+}
+
+function trimSeriesToken(trim) {
+  const token = String(trim || "")
+    .trim()
+    .split(/\s+/)[0];
+  return token || "";
+}
+
+function trimSeriesBadge(trim) {
+  const token = trimSeriesToken(trim);
+  if (!token) return "";
+  const isLariat = /^lariat$/i.test(token);
+  const label = isLariat ? "Lariat" : token;
+  return badge(label, isLariat ? "warn" : "");
+}
+
+function trimSeriesLabel(trim) {
+  const token = trimSeriesToken(trim);
+  if (!token) return "";
+  return /^lariat$/i.test(token) ? "Lariat" : token;
+}
+
+function accidentBucket(status) {
+  if (status === "reported") return { key: "reported", label: "事故", color: COLORS.red };
+  if (status === "clean" || status === "none") return { key: "clean", label: "无事故", color: COLORS.green };
+  return { key: "unknown", label: "事故未知", color: COLORS.muted };
 }
 
 function empty(text) {
@@ -141,7 +178,34 @@ function hbars(items, color) {
     .join("");
 }
 
-function columns(items) {
+function vehiclePriceBars(rows, activeVin) {
+  const priced = rows
+    .filter((v) => num(v.price_cad) !== null)
+    .slice()
+    .sort((a, b) => num(a.price_cad) - num(b.price_cad));
+  if (!priced.length) return empty("缺价格");
+  const max = Math.max(...priced.map((v) => num(v.price_cad)), 1);
+  return `<div class="inv-bars">${priced
+    .map((v) => {
+      const on = v.vin === activeVin;
+      const series = trimSeriesLabel(v.trim);
+      const accident = accidentBucket(v.accident_history_status);
+      const isLariat = /^lariat$/i.test(trimSeriesToken(v.trim));
+      const fill = isLariat ? COLORS.amber : v.status === "active" ? COLORS.blue : COLORS.red;
+      const label = [v.year, series].filter(Boolean).join(" ") || v.vin;
+      return `<button type="button" class="vbar${on ? " is-active" : ""}" data-vin="${escapeHtml(v.vin)}">
+        <span class="vbar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+        <div class="vbar-track"><div class="vbar-fill" style="width:${(num(v.price_cad) / max) * 100}%;background:${fill}"></div></div>
+        <span class="vbar-val">${money(v.price_cad)}</span>
+        <span class="vbar-tag ${accident.key === "clean" ? "on" : accident.key === "reported" ? "off" : ""}">${escapeHtml(
+          accident.label
+        )}</span>
+      </button>`;
+    })
+    .join("")}</div>`;
+}
+
+function columns(items, selectedLabel) {
   if (!items.length) return empty();
   const max = Math.max(...items.map((i) => i.value), 1);
   const w = Math.max(items.length * 36 + 24, 180);
@@ -151,43 +215,113 @@ function columns(items) {
       const bh = (it.value / max) * 108;
       const x = 18 + idx * 36;
       const y = 118 - bh;
-      return `<rect x="${x}" y="${y}" width="22" height="${Math.max(bh, 2)}" rx="4" fill="${it.color || COLORS.amber}"/>
-        <text x="${x + 11}" y="136" text-anchor="middle" class="axis">${escapeHtml(String(it.label).slice(-2))}</text>`;
+      const selected = selectedLabel !== "" && String(it.label) === String(selectedLabel);
+      return `<g class="col-group${selected ? " is-active" : ""}" data-year="${escapeHtml(String(it.label))}">
+        <rect x="${x}" y="${y}" width="22" height="${Math.max(bh, 2)}" rx="4" fill="${
+          selected ? COLORS.green : it.color || COLORS.amber
+        }"/>
+        <text x="${x + 11}" y="136" text-anchor="middle" class="axis">${escapeHtml(String(it.label).slice(-2))}</text>
+      </g>`;
     })
     .join("");
   return `<svg class="cols" viewBox="0 0 ${w} ${h}">${bars}</svg>`;
 }
 
-function scatter(points) {
+function niceStep(raw) {
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  const exp = Math.floor(Math.log10(raw));
+  const pow = 10 ** exp;
+  const frac = raw / pow;
+  const nice = frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 5 ? 5 : 10;
+  return nice * pow;
+}
+
+function niceTicks(min, max, count = 4) {
+  let lo = Number(min);
+  let hi = Number(max);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
+  if (lo === hi) {
+    const pad = niceStep(Math.abs(lo) || 1);
+    lo -= pad;
+    hi += pad;
+  }
+  const step = niceStep((hi - lo) / Math.max(count - 1, 1));
+  const start = Math.floor(lo / step) * step;
+  const end = Math.ceil(hi / step) * step;
+  const ticks = [];
+  const n = Math.round((end - start) / step);
+  for (let i = 0; i <= n; i += 1) {
+    ticks.push(Math.round((start + i * step) * 1e6) / 1e6);
+  }
+  return ticks;
+}
+
+function formatTick(value) {
+  return String(Math.round(value));
+}
+
+function scatter(points, activeVin) {
   const usable = points.filter((p) => p.x !== null && p.y !== null);
   if (!usable.length) return empty("缺价格或里程");
-  const w = 440;
-  const h = 220;
-  const pad = { l: 44, r: 12, t: 12, b: 28 };
+  const w = 460;
+  const h = 240;
+  const pad = { l: 58, r: 40, t: 16, b: 36 };
   const xs = usable.map((p) => p.x);
   const ys = usable.map((p) => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const xTicks = niceTicks(Math.min(...xs), Math.max(...xs), 4);
+  const yTicks = niceTicks(Math.min(...ys), Math.max(...ys), 4);
+  const minX = xTicks[0];
+  const maxX = xTicks[xTicks.length - 1];
+  const minY = yTicks[0];
+  const maxY = yTicks[yTicks.length - 1];
   const dx = maxX - minX || 1;
   const dy = maxY - minY || 1;
   const xPos = (v) => pad.l + ((v - minX) / dx) * (w - pad.l - pad.r);
   const yPos = (v) => pad.t + (1 - (v - minY) / dy) * (h - pad.t - pad.b);
+  const grid = [
+    ...xTicks.map(
+      (tick) =>
+        `<line x1="${xPos(tick)}" y1="${pad.t}" x2="${xPos(tick)}" y2="${h - pad.b}" class="gridline tick"/>`
+    ),
+    ...yTicks.map(
+      (tick) =>
+        `<line x1="${pad.l}" y1="${yPos(tick)}" x2="${w - pad.r}" y2="${yPos(tick)}" class="gridline tick"/>`
+    ),
+  ].join("");
+  const xLabels = xTicks
+    .map((tick) => `<text x="${xPos(tick)}" y="${h - 14}" text-anchor="middle" class="axis">${formatTick(tick)}</text>`)
+    .join("");
+  const yLabels = yTicks
+    .map((tick) => `<text x="${pad.l - 6}" y="${yPos(tick) + 3}" text-anchor="end" class="axis">${formatTick(tick)}</text>`)
+    .join("");
+  const unitLabels = `<text x="${w - pad.r + 4}" y="${h - 14}" class="axis">CAD</text>
+    <text x="${pad.l - 6}" y="${pad.t - 4}" text-anchor="end" class="axis">km</text>`;
   const dots = usable
-    .map(
-      (p) =>
-        `<circle cx="${xPos(p.x)}" cy="${yPos(p.y)}" r="5" fill="${p.color}" opacity="0.85">
+    .map((p) => {
+      const on = p.vin && p.vin === activeVin;
+      const vinAttr = p.vin ? `data-vin="${escapeHtml(p.vin)}"` : "";
+      return `<circle class="scatter-dot${on ? " is-active" : ""}" ${vinAttr}
+          cx="${xPos(p.x)}" cy="${yPos(p.y)}" r="${on ? 7 : 5}" fill="${p.color}"
+          opacity="${on ? 1 : 0.85}" ${on ? 'stroke="#fff" stroke-width="2"' : ""}>
+          <title>${escapeHtml(p.label)}</title>
+        </circle>
+        ${
+          p.vin
+            ? `<circle class="scatter-hit" data-vin="${escapeHtml(p.vin)}" cx="${xPos(p.x)}" cy="${yPos(p.y)}" r="14" fill="transparent">
           <title>${escapeHtml(p.label)}</title>
         </circle>`
-    )
+            : ""
+        }`;
+    })
     .join("");
   return `<svg class="scatter" viewBox="0 0 ${w} ${h}">
+    ${grid}
     <line x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}" class="gridline"/>
     <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h - pad.b}" class="gridline"/>
     ${dots}
-    <text x="${w / 2}" y="${h - 4}" text-anchor="middle" class="axis">价格 CAD</text>
-    <text x="12" y="${h / 2}" class="axis" transform="rotate(-90 12 ${h / 2})">里程 km</text>
+    ${xLabels}
+    ${yLabels}
+    ${unitLabels}
   </svg>`;
 }
 
@@ -272,9 +406,12 @@ async function loadTargetBundle() {
   return { targetId, inventory, observations, events };
 }
 
-function yearBars(vehicles) {
+function yearBars(vehicles, selectedYear) {
   const years = countBy(vehicles, (v) => v.year).sort((a, b) => String(a.label).localeCompare(String(b.label)));
-  return columns(years.map((y) => ({ ...y, color: COLORS.amber })));
+  return columns(
+    years.map((y) => ({ ...y, color: COLORS.amber })),
+    selectedYear || ""
+  );
 }
 
 async function render() {
@@ -333,7 +470,12 @@ async function renderOverview() {
           ${hbars(
             countBy(active, (v) => v.accident_history_status).map((i) => ({
               ...i,
-              color: i.label === "reported" ? COLORS.red : i.label === "none" ? COLORS.green : COLORS.muted,
+              color:
+                i.label === "reported"
+                  ? COLORS.red
+                  : i.label === "none" || i.label === "clean"
+                    ? COLORS.green
+                    : COLORS.muted,
             }))
           )}
         </div>
@@ -349,6 +491,7 @@ async function renderOverview() {
       ${kpi("VIN", t.tracked_vins, COLORS.blue, Math.max(t.tracked_vins, 1))}
       ${kpi("目标", t.targets, COLORS.amber, Math.max(t.targets, 1))}
     </div>
+    ${scheduleBanner(overview.schedule)}
     <div class="ops-grid" style="margin-bottom:12px">
       <button class="op-tile" id="btn-goto-recs" type="button">
         <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
@@ -371,6 +514,43 @@ async function renderOverview() {
   $("btn-goto-recs").addEventListener("click", () => showPage("recs"));
   $("btn-goto-inv").addEventListener("click", () => showPage("inventory"));
   $("btn-goto-import").addEventListener("click", () => showPage("import"));
+  const runScheduleBtn = $("btn-run-schedule");
+  if (runScheduleBtn) {
+    runScheduleBtn.addEventListener("click", async (ev) => {
+      await withButton(ev.currentTarget, async () => {
+        await api("/api/actions/run-schedule", { method: "POST", body: "{}" });
+        toast("已跑完一轮调度");
+        await renderOverview();
+      });
+    });
+  }
+  const gotoImportFromSchedule = $("btn-goto-import-from-schedule");
+  if (gotoImportFromSchedule) {
+    gotoImportFromSchedule.addEventListener("click", () => showPage("import"));
+  }
+}
+
+function scheduleBanner(schedule) {
+  const s = schedule || {};
+  if (!s.active) {
+    return `<div class="banner">本机调度未启动：只有 <code>clutch-tracker serve</code> 在跑时才会每 ${escapeHtml(String(s.interval_hours || 3))} 小时自动生成推荐并提醒扫描。</div>`;
+  }
+  const pending = Array.isArray(s.pending_scans) ? s.pending_scans.length : 0;
+  const next = s.next_run_at ? escapeHtml(String(s.next_run_at).slice(0, 16)) : "—";
+  const last = s.last_cycle?.finished_at
+    ? escapeHtml(String(s.last_cycle.finished_at).slice(0, 16))
+    : "还没有";
+  const hours = Number(s.interval_hours || 3);
+  const hoursLabel = Number.isFinite(hours) ? hours.toFixed(hours % 1 ? 1 : 0) : "3";
+  return `<div class="banner">
+    <strong>本机调度已开启</strong>：每 ${escapeHtml(hoursLabel)} 小时自动生成推荐/日报，并标记待扫描
+    （网页不会自己抓 Clutch）。下次 ${next} · 上次 ${last}
+    ${pending ? ` · 待扫描 ${pending}` : ""}
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btn-run-schedule" type="button">立即跑一轮</button>
+      <button class="btn" id="btn-goto-import-from-schedule" type="button">去扫描页</button>
+    </div>
+  </div>`;
 }
 
 function recPickCard(pick) {
@@ -515,47 +695,135 @@ async function renderInventory() {
           vehicles.length - active.length
         }</button>
       </div>
-      <input id="inv-q" type="search" placeholder="VIN / 年款 / 配置" style="min-width:200px" />
+      <input id="inv-q" type="search" placeholder="VIN / 年款 / 配置" style="min-width:200px" value="${escapeHtml(
+        state.invQuery
+      )}" />
       ${inventory.scan_complete ? badge("完整扫描", "on") : badge("部分扫描", "warn")}
     </div>
     <div class="charts" style="margin-bottom:12px">
-      <div class="panel"><div class="panel-title">价格 × 里程</div>${scatter(
-        (state.invFilter === "removed" ? vehicles.filter((v) => v.status !== "active") : state.invFilter === "all" ? vehicles : active).map(
-          (v) => ({
-            x: num(v.price_cad),
-            y: num(v.mileage_km),
-            label: `${v.year || ""} ${v.vin}`,
-            color: v.status === "active" ? COLORS.amber : COLORS.red,
-          })
-        )
-      )}</div>
-      <div class="panel"><div class="panel-title">年款</div>${yearBars(
-        state.invFilter === "removed"
-          ? vehicles.filter((v) => v.status !== "active")
-          : state.invFilter === "all"
-            ? vehicles
-            : active
-      )}</div>
+      <div class="panel"><div class="panel-title">价格 × 里程</div><div id="inv-scatter"></div></div>
+      <div class="panel"><div class="panel-title">年款</div><div id="inv-years"></div></div>
+    </div>
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-title">价格对比</div>
+      <div id="inv-bars"></div>
     </div>
     <div id="inv-cards" class="cards"></div>
   `;
 
-  const draw = () => {
-    const q = ($("inv-q").value || "").trim().toLowerCase();
+  const statusRows = () => {
     let rows = vehicles;
     if (state.invFilter === "active") rows = rows.filter((v) => v.status === "active");
     if (state.invFilter === "removed") rows = rows.filter((v) => v.status !== "active");
-    if (q) {
-      rows = rows.filter((v) => [v.vin, v.year, v.make, v.model, v.trim, v.status].join(" ").toLowerCase().includes(q));
+    return rows;
+  };
+
+  const queryRows = (rows) => {
+    const q = (state.invQuery || "").trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((v) => [v.vin, v.year, v.make, v.model, v.trim, v.status].join(" ").toLowerCase().includes(q));
+  };
+
+  const activeVin = () => state.invHoverVin || state.invSelectedVin;
+
+  const syncHighlight = (scroll) => {
+    const vin = activeVin();
+    document.querySelectorAll("#inv-scatter .scatter-dot").forEach((el) => {
+      const on = el.dataset.vin === vin;
+      el.classList.toggle("is-active", on);
+      el.setAttribute("r", on ? "7" : "5");
+      if (on) {
+        el.setAttribute("stroke", "#fff");
+        el.setAttribute("stroke-width", "2");
+      } else {
+        el.removeAttribute("stroke");
+        el.removeAttribute("stroke-width");
+      }
+    });
+    document.querySelectorAll("#inv-bars .vbar").forEach((el) => {
+      el.classList.toggle("is-active", el.dataset.vin === vin);
+    });
+    document.querySelectorAll("#inv-cards .vcard").forEach((el) => {
+      el.classList.toggle("is-active", el.dataset.vin === vin);
+    });
+    if (scroll && state.invSelectedVin) {
+      const bar = document.querySelector(`#inv-bars .vbar[data-vin="${CSS.escape(state.invSelectedVin)}"]`);
+      bar?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const card = document.querySelector(`#inv-cards .vcard[data-vin="${CSS.escape(state.invSelectedVin)}"]`);
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  };
+
+  const selectVin = (vin, scroll) => {
+    state.invSelectedVin = state.invSelectedVin === vin ? "" : vin;
+    syncHighlight(scroll);
+  };
+
+  const bindVinTarget = (el, scrollOnClick) => {
+    const vin = el.dataset.vin;
+    if (!vin) return;
+    el.addEventListener("mouseenter", () => {
+      state.invHoverVin = vin;
+      syncHighlight(false);
+    });
+    el.addEventListener("mouseleave", () => {
+      state.invHoverVin = "";
+      syncHighlight(false);
+    });
+    el.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      selectVin(vin, scrollOnClick);
+    });
+  };
+
+  const bindChartCardLinks = (chartRows) => {
+    $("inv-scatter").querySelectorAll(".scatter-hit, .scatter-dot").forEach((el) => bindVinTarget(el, true));
+    $("inv-bars").querySelectorAll(".vbar").forEach((el) => bindVinTarget(el, true));
+    $("inv-years").querySelectorAll(".col-group").forEach((el) => {
+      el.addEventListener("click", () => {
+        const year = el.dataset.year || "";
+        state.invYear = state.invYear === year ? "" : year;
+        state.invSelectedVin = "";
+        state.invHoverVin = "";
+        draw();
+      });
+    });
+    document.querySelectorAll("#inv-cards .vcard").forEach((el) => {
+      bindVinTarget(el, false);
+      el.querySelector("a")?.addEventListener("click", (ev) => ev.stopPropagation());
+    });
+    const known = new Set(chartRows.map((v) => v.vin));
+    if (state.invSelectedVin && !known.has(state.invSelectedVin)) state.invSelectedVin = "";
+    syncHighlight(false);
+  };
+
+  const draw = () => {
+    const searched = queryRows(statusRows());
+    const rows = state.invYear ? searched.filter((v) => String(v.year) === String(state.invYear)) : searched;
+    if (state.invSelectedVin && !rows.some((v) => v.vin === state.invSelectedVin)) {
+      state.invSelectedVin = "";
+    }
+    const vin = activeVin();
+    $("inv-scatter").innerHTML = scatter(
+      rows.map((v) => ({
+        x: num(v.price_cad),
+        y: num(v.mileage_km),
+        label: `${v.year || ""} ${v.trim || ""} ${v.vin}`.trim(),
+        color: v.status === "active" ? COLORS.amber : COLORS.red,
+        vin: v.vin,
+      })),
+      vin
+    );
+    $("inv-years").innerHTML = yearBars(searched, state.invYear);
+    $("inv-bars").innerHTML = vehiclePriceBars(rows, vin);
     $("inv-cards").innerHTML =
       rows
         .map((v) => {
           const p = num(v.price_cad);
           const m = num(v.mileage_km);
-          const accident = v.accident_history_status || "unknown";
           const use = v.previous_use || "unknown";
-          return `<article class="vcard">
+          const selected = v.vin === vin;
+          return `<article class="vcard${selected ? " is-active" : ""}" data-vin="${escapeHtml(v.vin)}">
             <div class="vcard-top">
               <div>
                 <div class="vcard-title">${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" ") || v.vin)}</div>
@@ -570,7 +838,8 @@ async function renderInventory() {
               m ? (m / maxKm) * 100 : 0
             }%;background:${COLORS.blue}"></div></div><b>${km(v.mileage_km)}</b></div>
             <div class="chips">
-              ${badge(accident === "reported" ? "事故" : accident === "none" ? "无事故" : "事故未知", accident === "reported" ? "removed" : accident === "none" ? "on" : "")}
+              ${trimSeriesBadge(v.trim)}
+              ${accidentBadge(v.accident_history_status || "unknown")}
               ${badge(use === "commercial" ? "商用" : use === "unknown" ? "用途未知" : use, use === "commercial" ? "warn" : "")}
             </div>
             <div class="vcard-top">
@@ -580,15 +849,23 @@ async function renderInventory() {
           </article>`;
         })
         .join("") || empty("没有匹配车辆");
+    bindChartCardLinks(rows);
   };
 
   $("inv-seg").querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.invFilter = btn.dataset.f;
-      renderInventory();
+      state.invYear = "";
+      state.invSelectedVin = "";
+      state.invHoverVin = "";
+      $("inv-seg").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+      draw();
     });
   });
-  $("inv-q").addEventListener("input", draw);
+  $("inv-q").addEventListener("input", () => {
+    state.invQuery = $("inv-q").value || "";
+    draw();
+  });
   draw();
 }
 
@@ -638,22 +915,31 @@ async function renderHistory() {
 
 async function renderImport() {
   const targetId = requireTargetId();
-  const [scans, detail] = await Promise.all([
+  const [scans, detail, schedule] = await Promise.all([
     api("/api/scans"),
     api(`/api/targets/${encodeURIComponent(targetId)}`),
+    api("/api/schedule").catch(() => ({ active: false, pending_scans: [] })),
   ]);
   const searchUrl = detail.target?.search_url;
   const c = detail.target?.criteria || {};
+  const pending = (schedule.pending_scans || []).find((s) => s.target_id === targetId);
   $("page-import").innerHTML = `
     <div class="banner">
-      <strong>扫描</strong>：网页不会自己去 Clutch 抓取。打开搜索页用浏览器扫完，把 JSON 拖到下面，再回「推荐」看当前还能买的车。
+      <strong>扫描</strong>：点「触发扫描」打开 Clutch 搜索页；用浏览器 Agent 扫完后把 JSON 拖进来导入。
+      网页本身不会抓取 Clutch。
+      ${pending ? `<div style="margin-top:6px">待扫描已标记 · ${escapeHtml((pending.requested_at || "").slice(0, 16))}</div>` : ""}
     </div>
     <div class="ops-grid" style="margin-bottom:12px">
+      <button class="op-tile" id="btn-trigger-scan" type="button">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        触发扫描
+        <span class="muted">打开搜索并标记待扫描</span>
+      </button>
       ${
         searchUrl
           ? `<a class="op-tile" id="open-clutch" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener">
               <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-              打开 Clutch 搜索
+              仅打开 Clutch
               <span class="muted">${escapeHtml([c.make, c.model, c.province].filter(Boolean).join(" · "))}</span>
             </a>`
           : ""
@@ -664,6 +950,7 @@ async function renderImport() {
         <span class="muted">导入之后点这里</span>
       </button>
     </div>
+    <div id="trigger-scan-result"></div>
     <div id="dropzone" class="dropzone">
       <svg class="drop-icon" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
       <div>把扫描 JSON 拖到这里，或点这里选文件</div>
@@ -681,6 +968,24 @@ async function renderImport() {
   `;
 
   $("scan-goto-recs").addEventListener("click", () => showPage("recs"));
+  $("btn-trigger-scan").addEventListener("click", async (ev) => {
+    await withButton(ev.currentTarget, async () => {
+      const result = await api("/api/actions/trigger-scan", {
+        method: "POST",
+        body: JSON.stringify({ target_id: targetId, open_browser: true }),
+      });
+      const scan = result.scan || {};
+      if (scan.search_url) {
+        window.open(scan.search_url, "_blank", "noopener");
+      }
+      toast(scan.search_url ? "已打开 Clutch 搜索" : "已标记待扫描");
+      $("trigger-scan-result").innerHTML = `<div class="banner" style="margin-bottom:12px">
+        已触发 <b>${escapeHtml(scan.target_id || targetId)}</b>
+        ${scan.requested_at ? ` · ${escapeHtml(String(scan.requested_at).slice(0, 16))}` : ""}
+        <div class="muted" style="margin-top:6px">用浏览器 Agent 按搜索条件扫完后，把 JSON 拖到下方导入。</div>
+      </div>`;
+    });
+  });
   const dropzone = $("dropzone");
   const fileInput = $("scan-file");
   dropzone.addEventListener("click", () => fileInput.click());
@@ -923,15 +1228,29 @@ $("target-select").addEventListener("change", () => {
   render();
 });
 
+async function pingOverview(timeoutMs = 800) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch("/api/overview", { cache: "no-store", signal: ctrl.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function waitForServer(tries = 50) {
+  let sawDown = false;
   for (let i = 0; i < tries; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 400));
-    try {
-      const res = await fetch("/api/overview", { cache: "no-store" });
-      if (res.ok) return;
-    } catch {
-      /* process is still coming up */
+    const ok = await pingOverview();
+    if (!ok) {
+      sawDown = true;
+      continue;
     }
+    if (sawDown) return;
   }
   throw new Error("重启后服务未恢复，请在终端查看 serve 输出");
 }

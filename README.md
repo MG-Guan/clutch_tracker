@@ -9,28 +9,20 @@ flowchart TD
     YAML["config/targets.yaml\n(search criteria)"]
     Agent["Browser Agent\n(raw scan JSON)"]
     CLI["cli.py import-scan"]
-    Archive["data/raw_scans/"]
+    DB["data/clutch_tracker.db\n(local SQLite)"]
     Engine["comparison.py + events.py"]
-    Registry["vehicles.csv\n(VIN registry)"]
-    Obs["observations.csv\n(append-only)"]
-    Events["listing_events.csv\n(append-only)"]
-    Inv["current_inventory.json\n(latest snapshot)"]
     Report["reporting.py"]
     Daily["reports/daily/&lt;target_id&gt;/"]
     Snap["snapshots/&lt;target_id&gt;/"]
 
     YAML --> Engine
     Agent --> CLI
-    CLI --> Archive
     CLI --> Engine
-    Engine --> Registry
-    Engine --> Obs
-    Engine --> Events
-    Engine --> Inv
-    Inv --> Report
+    Engine --> DB
+    DB --> Report
     Report --> Daily
     Report --> Snap
-    Inv --> Recs["recommendations.py"]
+    DB --> Recs["recommendations.py"]
     Recs --> RecDir["reports/recommendations/&lt;target_id&gt;/"]
 ```
 
@@ -40,41 +32,38 @@ flowchart TD
 |------|----------------|
 | No hard-coded vehicles | All criteria live in `config/targets.yaml` |
 | Unique targets | Each entry has a `target_id`; duplicates rejected at validation |
-| VIN as primary key | `vehicles.csv` registry keyed by VIN across all history |
-| Append-only history | `observations.csv` and `listing_events.csv` are never overwritten |
+| VIN as primary key | `vehicles` table keyed by `(target_id, vin)` |
+| Append-only history | `observations` and `listing_events` rows are never overwritten |
 | Partial scan safety | `scan_complete: false` never marks missing vehicles as removed |
 | Unknown stays unknown | Missing fields remain empty/null; no inference |
-| Repository is truth | Git-tracked files are the historical database, not agent memory |
-| Atomic writes | Temp file + `os.replace()` for all structured data updates |
+| Local DB is truth | Vehicle history lives in gitignored SQLite, not GitHub |
 | Timestamps | ISO 8601 in `America/Toronto` (`config/settings.yaml`) |
 
 ### Data layout
 
-Each configured target gets isolated storage:
-
 ```
-data/targets/<target_id>/
-├── vehicles.csv           # Permanent VIN registry
-├── observations.csv       # Append-only scan observations
-├── listing_events.csv     # Appeared / removed / price_changed events
-└── current_inventory.json # Latest inventory snapshot
+data/clutch_tracker.db       # Local SQLite (gitignored): registry, vehicles,
+                             # observations, events, inventory, raw scans
+config/targets.yaml          # Search criteria (tracked in git)
+config/settings.yaml         # storage.database_path, timezone
 
-reports/daily/<target_id>/   # Generated markdown reports
-reports/recommendations/<target_id>/  # Multi-dimensional recommendation reports
-snapshots/<target_id>/       # Point-in-time inventory snapshots
-data/raw_scans/              # Archived browser scan JSON
-data/registry/targets.csv    # Target metadata registry
+reports/daily/<target_id>/             # Generated markdown (gitignored)
+reports/recommendations/<target_id>/   # Generated recommendations (gitignored)
+snapshots/<target_id>/                 # Generated snapshots (gitignored)
 ```
+
+Legacy CSV/JSON under `data/targets/` or `data/raw_scans/` (if present) is imported
+into SQLite automatically on first open.
 
 ### Scan import pipeline
 
 1. Browser agent writes a scan JSON file with `target_id`, `scan_id`, `scanned_at`, `scan_complete`, and `vehicles[]`.
-2. `import-scan` archives the raw JSON to `data/raw_scans/<scan_id>.json`.
+2. `import-scan` archives the raw JSON into the local `raw_scans` table.
 3. Deterministic Python code:
    - Appends one observation row per scanned vehicle.
    - Updates the VIN registry (`first_seen_at` / `last_seen_at`).
    - Emits listing events (appeared, removed, price_changed).
-   - Rewrites `current_inventory.json` (active + removed statuses).
+   - Upserts `current_inventory` (active + removed statuses).
 4. Removals are emitted **only** when `scan_complete: true` and a previously active VIN is absent.
 
 ## Installation
@@ -95,6 +84,14 @@ clutch-tracker list-targets
 # or
 python -m clutch_tracker list-targets
 ```
+
+Local UI + schedule (while this process is running):
+
+```bash
+clutch-tracker serve
+```
+
+Default: every 3 hours regenerate recommendations/daily reports and mark browser scans as due (`config/settings.yaml` → `schedule`). Stops when `serve` exits. Does **not** scrape Clutch.ca.
 
 ### Troubleshooting
 
@@ -252,7 +249,9 @@ Supported statuses are `scanned`, `blocked`, `error`, `unavailable`, and `not_sc
 
 ### Recommendations report
 
-`generate-recommendations` reads `current_inventory.json`, `vehicles.csv`, `listing_events.csv`, and `config/targets.yaml` recommendation preferences to produce a markdown report with ranked picks across preference-aware dimensions:
+`generate-recommendations` reads inventory, vehicles, listing events from the local
+SQLite database, plus `config/targets.yaml` recommendation preferences, to produce a
+markdown report with ranked picks across preference-aware dimensions:
 
 | Dimension | Ranking logic |
 |-----------|---------------|
@@ -281,7 +280,7 @@ Use `--top N` to control how many picks appear per section (default: 3). Partial
 
 Vehicles with explicit accident-history data are still tracked. Reported accidents are excluded from recommendations unless the scan details clearly indicate a minor/simple repair (for example, cosmetic damage or a low repair cost). Excluded accident-risk vehicles remain visible in the recommendation report's Accident Risk Watchlist.
 
-Browser agents may also include maintenance/service-history details in each vehicle object, such as `service_history`, `maintenance_records`, `service_locations`, `records_count`, `locations_count`, or `replaced_parts`. The importer normalizes those explicit fields into maintenance risk metadata in `current_inventory.json`, emits `maintenance_history_assessed` events when the assessment changes, and excludes high maintenance-risk listings from recommendation rankings while still showing them in the maintenance risk watchlist.
+Browser agents may also include maintenance/service-history details in each vehicle object, such as `service_history`, `maintenance_records`, `service_locations`, `records_count`, `locations_count`, or `replaced_parts`. The importer normalizes those explicit fields into maintenance risk metadata in current inventory, emits `maintenance_history_assessed` events when the assessment changes, and excludes high maintenance-risk listings from recommendation rankings while still showing them in the maintenance risk watchlist.
 
 ### `config/settings.yaml`
 
@@ -305,9 +304,7 @@ See [AGENTS.md](AGENTS.md) for AI agent operating instructions.
 │   ├── targets.yaml
 │   └── settings.yaml
 ├── data/
-│   ├── registry/
-│   ├── raw_scans/
-│   └── targets/
+│   └── clutch_tracker.db    # Local SQLite (gitignored)
 ├── reports/
 │   ├── daily/
 │   ├── recommendations/
@@ -320,6 +317,7 @@ See [AGENTS.md](AGENTS.md) for AI agent operating instructions.
 │   ├── config.py
 │   ├── models.py
 │   ├── validation.py
+│   ├── db.py                # SQLite schema + legacy migration
 │   ├── storage.py
 │   ├── comparison.py
 │   ├── events.py

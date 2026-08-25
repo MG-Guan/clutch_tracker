@@ -7,11 +7,10 @@ from pathlib import Path
 
 from clutch_tracker.comparison import import_scan, parse_scan_payload
 from clutch_tracker.storage import (
-    events_path,
     load_current_inventory,
-    observations_path,
-    raw_scan_archive_path,
-    read_csv_rows,
+    load_events,
+    load_observations,
+    load_raw_scan,
 )
 
 
@@ -42,7 +41,7 @@ def test_import_complete_scan(project_copy: Path):
     assert inventory is not None
     assert len([v for v in inventory.vehicles if v.status == "active"]) == 2
 
-    observations = read_csv_rows(observations_path(project_copy, "ford-f150-ontario"))
+    observations = load_observations(project_copy, "ford-f150-ontario")
     assert len(observations) == 2
 
 
@@ -83,14 +82,15 @@ def test_import_records_carfax_accident_history_without_excluding(project_copy: 
     assert accident_vehicle.accident_severity == "unknown"
     assert accident_vehicle.recommendation_eligible is False
 
-    observations = read_csv_rows(observations_path(project_copy, "ford-f150-ontario"))
+    observations = load_observations(project_copy, "ford-f150-ontario")
     assert "1FTFW1E55NFA99999" in {row["vin"] for row in observations}
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     accident_events = [e for e in events if e["event_type"] == "accident_history_assessed"]
     assert len(accident_events) == 1
 
-    archive = json.loads(raw_scan_archive_path(project_copy, "scan_with_accident_history").read_text(encoding="utf-8"))
+    archive = load_raw_scan(project_copy, "scan_with_accident_history")
+    assert archive is not None
     assert len(archive["vehicles"]) == 3
 
 
@@ -179,7 +179,7 @@ def test_import_records_scanned_carfax_accident_damage_report(project_copy: Path
     assert summary["vehicles_with_non_recommendable_accident_history"] == 1
     assert summary["vehicles_with_scanned_history_reports"] == 1
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     assert any(e["event_type"] == "accident_history_assessed" for e in events)
     assert any(e["event_type"] == "vehicle_history_report_checked" for e in events)
 
@@ -228,7 +228,7 @@ def test_import_records_complex_maintenance_history(project_copy: Path):
     assert summary["vehicles_with_reported_maintenance_history"] == 1
     assert summary["vehicles_with_high_maintenance_risk"] == 1
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     maintenance_events = [e for e in events if e["event_type"] == "maintenance_history_assessed"]
     assert len(maintenance_events) == 1
     details = json.loads(maintenance_events[0]["details_json"])
@@ -269,7 +269,7 @@ def test_partial_scan_does_not_remove_vehicles(project_copy: Path):
     assert len(active) == 2, "Partial scan must not mark missing vehicles as removed"
     assert summary["removed_inventory"] == 0
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     removed_events = [e for e in events if e["event_type"] == "listing_removed"]
     assert len(removed_events) == 0
 
@@ -287,7 +287,7 @@ def test_complete_rescan_marks_removed(project_copy: Path):
     assert summary["active_inventory"] == 1
     assert summary["removed_inventory"] == 1
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     removed_events = [e for e in events if e["event_type"] == "listing_removed"]
     assert len(removed_events) == 1
 
@@ -301,6 +301,6 @@ def test_price_change_event(project_copy: Path):
     partial["scan_id"] = "scan_price_change"
     import_scan(project_copy, partial)
 
-    events = read_csv_rows(events_path(project_copy, "ford-f150-ontario"))
+    events = load_events(project_copy, "ford-f150-ontario")
     price_events = [e for e in events if e["event_type"] == "price_changed"]
     assert len(price_events) >= 1

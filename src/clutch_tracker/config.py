@@ -18,7 +18,7 @@ DEFAULT_TIMEZONE = "America/Toronto"
 def project_root(start: Path | None = None) -> Path:
     """Return the clutch_tracker project root directory."""
     if start is not None:
-        return start
+        return Path(start)
     return Path(__file__).resolve().parents[2]
 
 
