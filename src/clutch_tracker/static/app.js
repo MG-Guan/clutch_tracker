@@ -68,6 +68,19 @@ function badge(text, cls) {
   return `<span class="badge ${cls || ""}">${escapeHtml(text)}</span>`;
 }
 
+function listingBadge(status) {
+  if (status === "active") return badge("在售", "on");
+  if (status === "unavailable") return badge("不可用", "removed");
+  return badge("下架", "removed");
+}
+
+function availabilityChip(vehicle) {
+  const token = String(vehicle.availability_status || "").trim();
+  if (!token || token === "unknown" || token === "available") return "";
+  const label = token.replace(/_/g, " ");
+  return badge(label, "warn");
+}
+
 function accidentBadge(status) {
   const bucket = accidentBucket(status);
   const cls = bucket.key === "reported" ? "removed" : bucket.key === "clean" ? "on" : "";
@@ -438,14 +451,17 @@ async function renderOverview() {
     const { inventory } = await loadTargetBundle();
     const vehicles = inventory.vehicles || [];
     const active = vehicles.filter((v) => v.status === "active");
+    const unavailable = vehicles.filter((v) => v.status === "unavailable");
+    const removed = vehicles.filter((v) => v.status === "removed");
     charts = `
       <div class="charts">
         <div class="panel">
-          <div class="panel-title">在售 / 下架</div>
+          <div class="panel-title">在售 / 不可用 / 下架</div>
           ${donut(
             [
               { label: "在售", value: active.length, color: COLORS.green },
-              { label: "下架", value: vehicles.length - active.length, color: COLORS.red },
+              { label: "不可用", value: unavailable.length, color: COLORS.amber },
+              { label: "下架", value: removed.length, color: COLORS.red },
             ],
             "库存"
           )}
@@ -461,7 +477,7 @@ async function renderOverview() {
               x: num(v.price_cad),
               y: num(v.mileage_km),
               label: `${v.year || ""} ${v.vin} ${money(v.price_cad)}`,
-              color: v.status === "active" ? COLORS.amber : COLORS.muted,
+              color: v.status === "active" ? COLORS.amber : v.status === "unavailable" ? COLORS.purple : COLORS.muted,
             }))
           )}
         </div>
@@ -486,8 +502,9 @@ async function renderOverview() {
 
   $("page-overview").innerHTML = `
     <div class="kpis">
-      ${kpi("在售", t.active_listings, COLORS.green, Math.max(t.active_listings + t.removed_listings, 1))}
-      ${kpi("下架", t.removed_listings, COLORS.red, Math.max(t.active_listings + t.removed_listings, 1))}
+      ${kpi("在售", t.active_listings, COLORS.green, Math.max(t.active_listings + (t.unavailable_listings || 0) + t.removed_listings, 1))}
+      ${kpi("不可用", t.unavailable_listings || 0, COLORS.amber, Math.max(t.active_listings + (t.unavailable_listings || 0) + t.removed_listings, 1))}
+      ${kpi("下架", t.removed_listings, COLORS.red, Math.max(t.active_listings + (t.unavailable_listings || 0) + t.removed_listings, 1))}
       ${kpi("VIN", t.tracked_vins, COLORS.blue, Math.max(t.tracked_vins, 1))}
       ${kpi("目标", t.targets, COLORS.amber, Math.max(t.targets, 1))}
     </div>
@@ -681,6 +698,8 @@ async function renderInventory() {
   const { inventory } = await loadTargetBundle();
   const vehicles = inventory.vehicles || [];
   const active = vehicles.filter((v) => v.status === "active");
+  const unavailable = vehicles.filter((v) => v.status === "unavailable");
+  const removed = vehicles.filter((v) => v.status === "removed");
   const prices = active.map((v) => num(v.price_cad)).filter((n) => n !== null);
   const miles = active.map((v) => num(v.mileage_km)).filter((n) => n !== null);
   const maxPrice = Math.max(...prices, 1);
@@ -690,10 +709,9 @@ async function renderInventory() {
     <div class="row">
       <div class="seg" id="inv-seg">
         <button type="button" data-f="active" class="${state.invFilter === "active" ? "active" : ""}">在售 ${active.length}</button>
+        <button type="button" data-f="unavailable" class="${state.invFilter === "unavailable" ? "active" : ""}">不可用 ${unavailable.length}</button>
         <button type="button" data-f="all" class="${state.invFilter === "all" ? "active" : ""}">全部 ${vehicles.length}</button>
-        <button type="button" data-f="removed" class="${state.invFilter === "removed" ? "active" : ""}">下架 ${
-          vehicles.length - active.length
-        }</button>
+        <button type="button" data-f="removed" class="${state.invFilter === "removed" ? "active" : ""}">下架 ${removed.length}</button>
       </div>
       <input id="inv-q" type="search" placeholder="VIN / 年款 / 配置" style="min-width:200px" value="${escapeHtml(
         state.invQuery
@@ -714,7 +732,8 @@ async function renderInventory() {
   const statusRows = () => {
     let rows = vehicles;
     if (state.invFilter === "active") rows = rows.filter((v) => v.status === "active");
-    if (state.invFilter === "removed") rows = rows.filter((v) => v.status !== "active");
+    if (state.invFilter === "unavailable") rows = rows.filter((v) => v.status === "unavailable");
+    if (state.invFilter === "removed") rows = rows.filter((v) => v.status === "removed");
     return rows;
   };
 
@@ -809,7 +828,7 @@ async function renderInventory() {
         x: num(v.price_cad),
         y: num(v.mileage_km),
         label: `${v.year || ""} ${v.trim || ""} ${v.vin}`.trim(),
-        color: v.status === "active" ? COLORS.amber : COLORS.red,
+        color: v.status === "active" ? COLORS.amber : v.status === "unavailable" ? COLORS.purple : COLORS.red,
         vin: v.vin,
       })),
       vin
@@ -829,7 +848,7 @@ async function renderInventory() {
                 <div class="vcard-title">${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" ") || v.vin)}</div>
                 <div class="vcard-sub">${escapeHtml(v.trim || "")}</div>
               </div>
-              ${v.status === "active" ? badge("在售", "on") : badge("下架", "removed")}
+              ${listingBadge(v.status)}
             </div>
             <div class="meter"><span>价格</span><div class="meter-track"><div class="meter-fill" style="width:${
               p ? (p / maxPrice) * 100 : 0
@@ -839,6 +858,7 @@ async function renderInventory() {
             }%;background:${COLORS.blue}"></div></div><b>${km(v.mileage_km)}</b></div>
             <div class="chips">
               ${trimSeriesBadge(v.trim)}
+              ${availabilityChip(v)}
               ${accidentBadge(v.accident_history_status || "unknown")}
               ${badge(use === "commercial" ? "商用" : use === "unknown" ? "用途未知" : use, use === "commercial" ? "warn" : "")}
             </div>

@@ -45,6 +45,31 @@ def test_import_complete_scan(project_copy: Path):
     assert len(observations) == 2
 
 
+def test_import_marks_non_purchasable_listings_unavailable(project_copy: Path):
+    data = _load_fixture("scan_complete.json")
+    data["scan_id"] = "scan_availability_mix"
+    data["vehicles"] = [
+        {
+            **data["vehicles"][0],
+            "availability_status": "available",
+        },
+        {
+            **data["vehicles"][1],
+            "vin": "2C3CCAAG5JH999999",
+            "availability_status": "coming_soon",
+        },
+    ]
+
+    summary = import_scan(project_copy, data)
+
+    assert summary["active_inventory"] == 1
+    inventory = load_current_inventory(project_copy, "ford-f150-ontario")
+    by_vin = {v.vin: v for v in inventory.vehicles}
+    assert by_vin["1FTFW1E50NFA12345"].status == "active"
+    assert by_vin["2C3CCAAG5JH999999"].status == "unavailable"
+    assert by_vin["2C3CCAAG5JH999999"].availability_status == "coming_soon"
+
+
 def test_import_records_carfax_accident_history_without_excluding(project_copy: Path):
     data = _load_fixture("scan_complete.json")
     data["scan_id"] = "scan_with_accident_history"

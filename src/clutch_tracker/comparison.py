@@ -12,6 +12,7 @@ from clutch_tracker.accident_history import (
     assess_accident_history,
     assess_vehicle_history_report,
 )
+from clutch_tracker.availability import assess_listing_availability
 from clutch_tracker.config import load_settings, project_root
 from clutch_tracker.events import build_listing_events
 from clutch_tracker.maintenance_history import MaintenanceAssessment, assess_maintenance_history
@@ -160,6 +161,8 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         price_cad=prev.price_cad,
         mileage_km=prev.mileage_km,
         status="removed",
+        availability_status=prev.availability_status,
+        availability_details=prev.availability_details,
         accident_history_status=prev.accident_history_status,
         accident_severity=prev.accident_severity,
         accident_details=prev.accident_details,
@@ -273,6 +276,7 @@ def _inventory_from_scan(
         history_report_assessment = _merge_vehicle_history_report_assessment(scanned, prev)
         maintenance_assessment = _merge_maintenance_assessment(scanned, prev)
         usage_assessment = _merge_usage_assessment(scanned, prev)
+        availability = assess_listing_availability(scanned.extra)
         updated_by_vin[scanned.vin] = InventoryVehicle(
             vin=scanned.vin,
             last_seen_at=payload.scanned_at,
@@ -284,7 +288,9 @@ def _inventory_from_scan(
             trim=scanned.trim or (prev.trim if prev else None),
             price_cad=normalize_optional_str(scanned.price_cad) or (prev.price_cad if prev else None),
             mileage_km=normalize_optional_str(scanned.mileage_km) or (prev.mileage_km if prev else None),
-            status="active",
+            status=availability.listing_status,
+            availability_status=availability.availability_status,
+            availability_details=availability.details,
             accident_history_status=accident_assessment.status,
             accident_severity=accident_assessment.severity,
             accident_details=accident_assessment.details,
@@ -303,7 +309,9 @@ def _inventory_from_scan(
             province_history=", ".join(usage_assessment.provinces) or None,
             interprovincial_details=usage_assessment.interprovincial_details,
             recommendation_eligible=(
-                accident_assessment.recommendation_eligible and maintenance_assessment.recommendation_eligible
+                availability.listing_status == "active"
+                and accident_assessment.recommendation_eligible
+                and maintenance_assessment.recommendation_eligible
             ),
         )
 
@@ -325,7 +333,9 @@ def _inventory_from_scan(
                     trim=prev.trim,
                     price_cad=prev.price_cad,
                     mileage_km=prev.mileage_km,
-                    status="active",
+                    status=prev.status,
+                    availability_status=prev.availability_status,
+                    availability_details=prev.availability_details,
                     accident_history_status=prev.accident_history_status,
                     accident_severity=prev.accident_severity,
                     accident_details=prev.accident_details,
@@ -613,6 +623,7 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
     save_current_inventory(root_path, new_inventory)
 
     active_count = sum(1 for v in new_inventory.vehicles if v.status == "active")
+    unavailable_count = sum(1 for v in new_inventory.vehicles if v.status == "unavailable")
     removed_count = sum(1 for v in new_inventory.vehicles if v.status == "removed")
     assessments = [assess_accident_history(vehicle.extra) for vehicle in payload.vehicles]
     reported_accident_count = sum(1 for assessment in assessments if assessment.status == "reported")
@@ -665,6 +676,7 @@ def import_scan(root: Path | None, scan_data: dict[str, Any]) -> dict[str, Any]:
         "observations_added": len(observations),
         "events_added": len(events),
         "active_inventory": active_count,
+        "unavailable_inventory": unavailable_count,
         "removed_inventory": removed_count,
     }
     logger.info("Scan import complete: %s", summary)
