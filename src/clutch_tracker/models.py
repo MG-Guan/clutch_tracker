@@ -124,6 +124,8 @@ class InventoryVehicle:
     price_cad: str | None = None
     mileage_km: str | None = None
     status: str = "active"
+    availability_status: str = "unknown"
+    availability_details: str | None = None
     accident_history_status: str = "unknown"
     accident_severity: str = "unknown"
     accident_details: str | None = None
