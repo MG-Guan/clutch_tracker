@@ -449,6 +449,7 @@ def _list_targets(root: Path) -> list[dict[str, Any]]:
         inventory = load_current_inventory(root, target.target_id)
         vehicles = load_vehicles(root, target.target_id)
         active = sum(1 for v in (inventory.vehicles if inventory else []) if v.status == "active")
+        unavailable = sum(1 for v in (inventory.vehicles if inventory else []) if v.status == "unavailable")
         removed = sum(1 for v in (inventory.vehicles if inventory else []) if v.status == "removed")
         rows.append(
             {
@@ -457,6 +458,7 @@ def _list_targets(root: Path) -> list[dict[str, Any]]:
                 "enabled": target.enabled,
                 "criteria_summary": format_criteria_summary(target.criteria),
                 "active_listings": active,
+                "unavailable_listings": unavailable,
                 "removed_listings": removed,
                 "tracked_vins": len(vehicles),
                 "last_scan_id": inventory.scan_id if inventory else None,
@@ -478,6 +480,7 @@ def _overview(root: Path) -> dict[str, Any]:
             "targets": len(targets),
             "enabled": sum(1 for t in targets if t["enabled"]),
             "active_listings": sum(t["active_listings"] for t in targets),
+            "unavailable_listings": sum(t.get("unavailable_listings", 0) for t in targets),
             "removed_listings": sum(t["removed_listings"] for t in targets),
             "tracked_vins": sum(t["tracked_vins"] for t in targets),
         },
