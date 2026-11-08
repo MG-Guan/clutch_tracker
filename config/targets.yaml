@@ -23,7 +23,28 @@ targets:
       max_year: 2026
       search_query: "F-150"
       recommendation_preferences:
+        # A listing matches when it satisfies trim_must_contain or any profile.
+        # F-150 Standard Bed is the 6.5 ft box. Clutch labels PowerBoost as Hybrid.
         trim_must_contain:
           - "502A"
           - "Crew Cab"
           - "Short Bed"
+        profiles:
+          - name: Tremor
+            trim_must_contain:
+              - "Tremor"
+          - name: XLT 6.5 ft bed
+            trim_must_contain:
+              - "XLT"
+              - "Standard Bed"
+          - name: 502A 6.5 ft bed
+            trim_must_contain:
+              - "502A"
+              - "Standard Bed"
+          - name: PowerBoost
+            text_any_of:
+              - "PowerBoost"
+              - "Hybrid"
+          - name: Platinum
+            trim_must_contain:
+              - "Platinum"

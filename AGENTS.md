@@ -144,9 +144,28 @@ snapshots/<target_id>/               # Generated inventory snapshots (gitignored
 On first open, any leftover legacy CSV/JSON under `data/targets/` or `data/raw_scans/`
 is imported into SQLite automatically once.
 
+## Publishing scans and recommendations
+
+After `import-scan`, `generate-report`, and `generate-recommendations`, publish the
+generated artifacts **on `main`**. Do not create a feature branch and do not open
+a pull request for a scan or a recommendation run.
+
+1. Check out and update `main` (`git checkout main` and `git pull origin main`).
+2. Force-add only the generated files for this run, then commit on `main`:
+   - `reports/daily/<target_id>/<date>.md`
+   - `reports/recommendations/<target_id>/<date>.md`
+   - `snapshots/<target_id>/<date>_inventory.json`
+3. Push that commit: `git push origin main`.
+
+The SQLite database stays gitignored. Those report paths are gitignored too, so
+use `git add -f` for the three files above. If the worktree was opened on another
+branch, move the commits onto `main` and push `main`; do not leave the scan or
+the recommendation only on a side branch.
+
 ## What Agents Should NOT Do
 
 - Do not scrape Clutch.ca directly from Python (browser agents collect raw data).
 - Do not modify historical observations or events.
 - Do not hard-code vehicle criteria in Python.
 - Do not treat partial scans as complete inventory snapshots.
+- Do not open a branch or pull request to deliver a scan or recommendation report.

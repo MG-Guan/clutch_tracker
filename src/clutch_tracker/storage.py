@@ -299,6 +299,7 @@ def _inventory_vehicle_from_dict(v: dict[str, Any]) -> InventoryVehicle:
         province_history=v.get("province_history"),
         interprovincial_details=v.get("interprovincial_details"),
         recommendation_eligible=v.get("recommendation_eligible", True),
+        feature_tags=v.get("feature_tags"),
     )
 
 
@@ -335,6 +336,7 @@ def _inventory_vehicle_to_dict(v: InventoryVehicle) -> dict[str, Any]:
         "province_history": v.province_history,
         "interprovincial_details": v.interprovincial_details,
         "recommendation_eligible": v.recommendation_eligible,
+        "feature_tags": v.feature_tags,
     }
 
 

@@ -144,6 +144,7 @@ class InventoryVehicle:
     province_history: str | None = None
     interprovincial_details: str | None = None
     recommendation_eligible: bool = True
+    feature_tags: str | None = None
 
 
 @dataclass

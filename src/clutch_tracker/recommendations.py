@@ -60,6 +60,7 @@ class VehicleSnapshot:
     province_history: str | None
     interprovincial_details: str | None
     recommendation_eligible: bool
+    feature_tags: str | None = None
 
 
 @dataclass(frozen=True)
@@ -489,13 +490,27 @@ def _active_snapshots(
                 province_history=vehicle.province_history,
                 interprovincial_details=vehicle.interprovincial_details,
                 recommendation_eligible=vehicle.recommendation_eligible,
+                feature_tags=vehicle.feature_tags,
             )
         )
     return snapshots
 
 
 def _matches_preferences(vehicle: VehicleSnapshot, preferences) -> bool:
-    return vehicle_matches_recommendation_preferences(vehicle.trim, preferences)
+    return vehicle_matches_recommendation_preferences(
+        vehicle.trim,
+        preferences,
+        vehicle.feature_tags,
+    )
+
+
+def _display_trim(vehicle: VehicleSnapshot) -> str:
+    trim = _display(vehicle.trim)
+    tags = (vehicle.feature_tags or "").lower()
+    if "powerboost" in tags or "hybrid" in tags:
+        if "powerboost" not in trim.lower() and "hybrid" not in trim.lower():
+            return f"{trim} · PowerBoost"
+    return trim
 
 
 def _parse_positive_number(value: str | None) -> float | None:
@@ -605,7 +620,7 @@ def _rank_relative_price(active: list[VehicleSnapshot], top_n: int) -> list[Rank
             RankedPick(
                 vin=vehicle.vin,
                 year=_display(vehicle.year),
-                trim=_display(vehicle.trim),
+                trim=_display_trim(vehicle),
                 price_cad=_display(vehicle.price_cad),
                 mileage_km=_display(vehicle.mileage_km),
                 metric=f"{delta:+,.0f} CAD",
@@ -632,7 +647,7 @@ def _rank_outside_preferences(active: list[VehicleSnapshot], top_n: int) -> list
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=_display(vehicle.price_cad),
@@ -659,7 +674,7 @@ def _rank_low_mileage(active: list[VehicleSnapshot], top_n: int) -> list[RankedP
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=_display(vehicle.mileage_km),
@@ -693,7 +708,7 @@ def _rank_best_price_by_year(active: list[VehicleSnapshot], top_n: int) -> list[
             RankedPick(
                 vin=vehicle.vin,
                 year=year,
-                trim=_display(vehicle.trim),
+                trim=_display_trim(vehicle),
                 price_cad=_display(vehicle.price_cad),
                 mileage_km=_display(vehicle.mileage_km),
                 metric=year,
@@ -726,7 +741,7 @@ def _rank_new_listings(
             RankedPick(
                 vin=vehicle.vin,
                 year=_display(vehicle.year),
-                trim=_display(vehicle.trim),
+                trim=_display_trim(vehicle),
                 price_cad=_display(vehicle.price_cad),
                 mileage_km=_display(vehicle.mileage_km),
                 metric=first_seen_at,
@@ -784,7 +799,7 @@ def _rank_price_drops(
             RankedPick(
                 vin=vin,
                 year=_display(vehicle.year),
-                trim=_display(vehicle.trim),
+                trim=_display_trim(vehicle),
                 price_cad=f"{int(new_price)}",
                 mileage_km=_display(vehicle.mileage_km),
                 metric=f"-{int(drop)} CAD",
@@ -817,7 +832,7 @@ def _rank_accident_risk(active: list[VehicleSnapshot], top_n: int) -> list[Ranke
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=vehicle.accident_severity,
@@ -848,7 +863,7 @@ def _rank_history_report_scan_gaps(active: list[VehicleSnapshot], top_n: int) ->
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=vehicle.vehicle_history_report_status,
@@ -882,7 +897,7 @@ def _rank_maintenance_risk(active: list[VehicleSnapshot], top_n: int) -> list[Ra
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=vehicle.maintenance_risk_level,
@@ -912,7 +927,7 @@ def _rank_usage_disclosure(active: list[VehicleSnapshot], top_n: int) -> list[Ra
         RankedPick(
             vin=vehicle.vin,
             year=_display(vehicle.year),
-            trim=_display(vehicle.trim),
+            trim=_display_trim(vehicle),
             price_cad=_display(vehicle.price_cad),
             mileage_km=_display(vehicle.mileage_km),
             metric=_format_usage_history(vehicle),

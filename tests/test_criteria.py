@@ -98,6 +98,24 @@ def test_parse_recommendation_preferences_from_target():
     )
     assert not vehicle_matches_recommendation_preferences(None, preferences)
     assert format_recommendation_preferences(preferences).startswith("trim contains")
+    assert vehicle_matches_recommendation_preferences(
+        "Tremor 402A Crew Cab Short Bed",
+        preferences,
+    )
+    assert vehicle_matches_recommendation_preferences(
+        "XLT Crew Cab Standard Bed",
+        preferences,
+    )
+    assert vehicle_matches_recommendation_preferences(
+        "XLT 302A Crew Cab Short Bed",
+        preferences,
+        "Hybrid",
+    )
+    assert not vehicle_matches_recommendation_preferences(
+        "XLT 301A Crew Cab Short Bed",
+        preferences,
+        "Gasoline",
+    )
 
 
 def test_format_criteria_summary_includes_make_model():

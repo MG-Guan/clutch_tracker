@@ -272,9 +272,14 @@ recommendation_preferences:
     - "Short Bed"
   trim_must_not_contain:
     - "STX"
+  profiles:
+    - name: Tremor
+      trim_must_contain: ["Tremor"]
+    - name: PowerBoost
+      text_any_of: ["PowerBoost", "Hybrid"]
 ```
 
-All tokens in `trim_must_contain` must appear in the listing trim string (case-insensitive). Unknown trim never satisfies a non-empty `trim_must_contain` list.
+All tokens in a `trim_must_contain` list must appear in the listing trim string (case-insensitive). A listing joins the preference cohort when it satisfies the top-level list or any `profiles` entry. `text_any_of` matches trim plus scan fields `fuel_type`, `engine`, `powertrain`, `bed_length`, and `features`. Unknown trim never satisfies a non-empty `trim_must_contain` list.
 
 Use `--top N` to control how many picks appear per section (default: 3). Partial scans (`scan_complete: false`) trigger a data-quality warning in the report.
 
