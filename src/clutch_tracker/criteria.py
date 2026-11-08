@@ -17,11 +17,22 @@ def normalize_model_token(value: str) -> str:
 
 
 @dataclass(frozen=True)
+class RecommendationProfile:
+    """One alternate trim/feature cohort. Tokens inside a profile are combined with AND."""
+
+    name: str
+    trim_must_contain: tuple[str, ...] = ()
+    trim_must_not_contain: tuple[str, ...] = ()
+    text_any_of: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class RecommendationPreferences:
     """Target-specific filters for recommendation cohorts (from targets.yaml extra)."""
 
     trim_must_contain: tuple[str, ...] = ()
     trim_must_not_contain: tuple[str, ...] = ()
+    profiles: tuple[RecommendationProfile, ...] = ()
 
 
 def _parse_string_list(value: Any, field_name: str) -> tuple[str, ...]:
@@ -30,6 +41,36 @@ def _parse_string_list(value: Any, field_name: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise ValueError(f"recommendation_preferences.{field_name} must be a list")
     return tuple(str(item).strip() for item in value if item is not None and str(item).strip())
+
+
+def _parse_profiles(value: Any) -> tuple[RecommendationProfile, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError("recommendation_preferences.profiles must be a list")
+    profiles: list[RecommendationProfile] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"recommendation_preferences.profiles[{index}] must be a mapping")
+        name = str(item.get("name") or "").strip() or f"profile {index + 1}"
+        profiles.append(
+            RecommendationProfile(
+                name=name,
+                trim_must_contain=_parse_string_list(
+                    item.get("trim_must_contain"),
+                    f"profiles[{index}].trim_must_contain",
+                ),
+                trim_must_not_contain=_parse_string_list(
+                    item.get("trim_must_not_contain"),
+                    f"profiles[{index}].trim_must_not_contain",
+                ),
+                text_any_of=_parse_string_list(
+                    item.get("text_any_of"),
+                    f"profiles[{index}].text_any_of",
+                ),
+            )
+        )
+    return tuple(profiles)
 
 
 def parse_recommendation_preferences(criteria: TargetCriteria) -> RecommendationPreferences:
@@ -42,31 +83,66 @@ def parse_recommendation_preferences(criteria: TargetCriteria) -> Recommendation
     return RecommendationPreferences(
         trim_must_contain=_parse_string_list(raw.get("trim_must_contain"), "trim_must_contain"),
         trim_must_not_contain=_parse_string_list(raw.get("trim_must_not_contain"), "trim_must_not_contain"),
+        profiles=_parse_profiles(raw.get("profiles")),
     )
+
+
+def _contains_all(haystack: str, tokens: tuple[str, ...]) -> bool:
+    return all(token.lower() in haystack for token in tokens)
+
+
+def _legacy_trim_match(trim: str | None, preferences: RecommendationPreferences) -> bool:
+    if not preferences.trim_must_contain and not preferences.trim_must_not_contain:
+        return True
+    if trim is None or not str(trim).strip():
+        return False
+    normalized = str(trim).lower()
+    if not _contains_all(normalized, preferences.trim_must_contain):
+        return False
+    return all(token.lower() not in normalized for token in preferences.trim_must_not_contain)
+
+
+def _profile_match(
+    trim: str | None,
+    feature_text: str | None,
+    profile: RecommendationProfile,
+) -> bool:
+    if not profile.trim_must_contain and not profile.trim_must_not_contain and not profile.text_any_of:
+        return False
+    normalized_trim = str(trim or "").lower()
+    if profile.trim_must_contain and (trim is None or not str(trim).strip()):
+        return False
+    if not _contains_all(normalized_trim, profile.trim_must_contain):
+        return False
+    if any(token.lower() in normalized_trim for token in profile.trim_must_not_contain):
+        return False
+    if profile.text_any_of:
+        haystack = f"{normalized_trim} {str(feature_text or '').lower()}"
+        if not any(token.lower() in haystack for token in profile.text_any_of):
+            return False
+    return True
 
 
 def vehicle_matches_recommendation_preferences(
     trim: str | None,
     preferences: RecommendationPreferences,
+    feature_text: str | None = None,
 ) -> bool:
     """
-    Return whether a listing trim satisfies configured recommendation filters.
+    Return whether a listing satisfies configured recommendation filters.
 
+    Top-level trim tokens are one cohort. Each profile is another cohort.
+    A listing matches when it satisfies the top-level filters or any profile.
     Unknown trim never satisfies a non-empty trim_must_contain list.
     """
-    if not preferences.trim_must_contain and not preferences.trim_must_not_contain:
-        return True
-    if trim is None or not str(trim).strip():
+    has_legacy = bool(preferences.trim_must_contain or preferences.trim_must_not_contain)
+    if preferences.profiles:
+        if any(_profile_match(trim, feature_text, profile) for profile in preferences.profiles):
+            return True
+        if has_legacy:
+            return _legacy_trim_match(trim, preferences)
         return False
-
-    normalized = str(trim).lower()
-    for token in preferences.trim_must_contain:
-        if token.lower() not in normalized:
-            return False
-    for token in preferences.trim_must_not_contain:
-        if token.lower() in normalized:
-            return False
-    return True
+    return _legacy_trim_match(trim, preferences)
 
 
 def format_recommendation_preferences(preferences: RecommendationPreferences) -> str:
@@ -76,6 +152,16 @@ def format_recommendation_preferences(preferences: RecommendationPreferences) ->
         parts.append("trim contains " + ", ".join(preferences.trim_must_contain))
     if preferences.trim_must_not_contain:
         parts.append("trim excludes " + ", ".join(preferences.trim_must_not_contain))
+    for profile in preferences.profiles:
+        detail: list[str] = []
+        if profile.trim_must_contain:
+            detail.append("trim " + "+".join(profile.trim_must_contain))
+        if profile.text_any_of:
+            detail.append("text " + "/".join(profile.text_any_of))
+        if profile.trim_must_not_contain:
+            detail.append("excludes " + "+".join(profile.trim_must_not_contain))
+        suffix = f" ({', '.join(detail)})" if detail else ""
+        parts.append(profile.name + suffix)
     return "; ".join(parts) if parts else "(no preference filters)"
 
 

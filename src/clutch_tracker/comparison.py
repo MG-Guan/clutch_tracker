@@ -148,6 +148,27 @@ def _build_observation(scanned: ScanVehicle, payload: ScanPayload) -> Observatio
     )
 
 
+_FEATURE_TAG_KEYS = ("powertrain", "fuel_type", "engine", "bed_length", "features")
+
+
+def _feature_tags(extra: dict[str, Any], previous: InventoryVehicle | None) -> str | None:
+    """Keep explicit powertrain/bed text for recommendation profiles."""
+    parts: list[str] = []
+    for key in _FEATURE_TAG_KEYS:
+        value = extra.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    if not parts:
+        return previous.feature_tags if previous else None
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        if part not in seen:
+            seen.add(part)
+            deduped.append(part)
+    return " | ".join(deduped)
+
+
 def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
     return InventoryVehicle(
         vin=prev.vin,
@@ -181,6 +202,7 @@ def _removed_inventory_vehicle(prev: InventoryVehicle) -> InventoryVehicle:
         province_history=prev.province_history,
         interprovincial_details=prev.interprovincial_details,
         recommendation_eligible=prev.recommendation_eligible,
+        feature_tags=prev.feature_tags,
     )
 
 
@@ -313,6 +335,7 @@ def _inventory_from_scan(
                 and accident_assessment.recommendation_eligible
                 and maintenance_assessment.recommendation_eligible
             ),
+            feature_tags=_feature_tags(scanned.extra, prev),
         )
 
     if payload.scan_complete:
@@ -354,6 +377,7 @@ def _inventory_from_scan(
                     province_history=prev.province_history,
                     interprovincial_details=prev.interprovincial_details,
                     recommendation_eligible=prev.recommendation_eligible,
+                    feature_tags=prev.feature_tags,
                 )
 
     return CurrentInventory(
